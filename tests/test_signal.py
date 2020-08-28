@@ -351,6 +351,16 @@ def test_append(impulse):
     npt.assert_allclose(signal._data, truth)
 
 
+def test_append_different_domain(impulse):
+    signal = Signal(impulse, 44100)
+    second = Signal(impulse, 44100)
+    second.domain = 'freq'
+    signal.append(second)
+
+    truth = np.vstack((impulse, impulse))
+    npt.assert_allclose(signal._data, truth, atol=1e-10, rtol=1e-10)
+
+
 @pytest.fixture
 def sine():
     """Generate a sine signal with f = 440 Hz and sampling_rate = 44100 Hz.
