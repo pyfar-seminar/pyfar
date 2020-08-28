@@ -343,6 +343,14 @@ def test_magic_len(impulse):
     assert len(signal) == 1000
 
 
+def test_append(impulse):
+    signal = Signal(impulse, 44100)
+    signal.append(signal)
+
+    truth = np.vstack((impulse, impulse))
+    npt.assert_allclose(signal._data, truth)
+
+
 @pytest.fixture
 def sine():
     """Generate a sine signal with f = 440 Hz and sampling_rate = 44100 Hz.

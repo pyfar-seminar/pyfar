@@ -307,3 +307,11 @@ class Signal(Audio):
             raise ValueError("The number of samples does not match.")
         if self.signal_type != other.signal_type:
             raise ValueError("The signal types do not match.")
+
+    def append(self, sig):
+        """Append a second signal to the end of this signal.
+        """
+        self._assert_matching_meta_data(sig)
+        sig.domain = self.domain
+
+        self._data = np.r_[self._data, sig._data]
