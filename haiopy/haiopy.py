@@ -14,6 +14,37 @@ class Audio(object):
         """TODO: to be defined1. """
 
 
+def concatenate(first, second, axis=0):
+    """Merge two signal objects if their length, dimensions
+    and sampling rates match. Both signals are copied and
+    a new object is returned.
+
+    Parameters
+    ----------
+    first : Signal
+        The first signal
+    second : Signal
+        The second signal
+
+    Returns
+    -------
+    merged : Signal
+        The merged signal object
+    """
+    first._assert_matching_meta_data(second)
+    if axis < 0:
+        axis -= 1
+    data = np.concatenate(
+        (first._data, second._data),
+        axis=axis)
+
+    return Signal(
+        data,
+        first.sampling_rate,
+        n_samples=first.n_samples,
+        signal_type=first.signal_type)
+
+
 class Signal(Audio):
     """Class for audio signals.
 
