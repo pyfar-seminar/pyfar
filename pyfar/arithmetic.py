@@ -5,7 +5,7 @@
 
 import numpy as np
 from typing import Callable
-from pyfar.pyfar import Signal
+from pyfar import Signal
 
 
 def add(data: tuple, domain='freq'):

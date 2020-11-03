@@ -2,7 +2,7 @@ import numpy as np
 import numpy.testing as npt
 from pytest import raises
 
-from pyfar import Signal
+from pyfar.signal import Signal
 import pyfar.arithmetic as arithmetic
 
 

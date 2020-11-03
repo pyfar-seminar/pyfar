@@ -2,7 +2,7 @@ import numpy as np
 import numpy.testing as npt
 from pytest import raises
 
-from pyfar import Coordinates
+from pyfar.coordinates import Coordinates
 import pyfar.coordinates as coordinates
 
 

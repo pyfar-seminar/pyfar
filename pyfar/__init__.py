@@ -7,12 +7,12 @@ __email__ = ''
 __version__ = '0.1.0'
 
 
-from .pyfar import Signal
+from .signal import Signal
 from .coordinates import Coordinates
 from .orientations import Orientations
 
-import pyfar.plot as plot
-import pyfar.pyfar as pyfar
+from . import plot as plot
+from . import spatial
 
 
-__all__ = ['Signal', 'Coordinates', 'Orientations', 'plot', 'pyfar']
+__all__ = ['Signal', 'Coordinates', 'Orientations', 'plot', 'spatial']
