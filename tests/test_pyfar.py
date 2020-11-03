@@ -5,6 +5,6 @@ from pytest import raises
 
 def test_import_haiopy():
     try:
-        import haiopy           # noqa
+        import pyfar           # noqa
     except ImportError:
         assert False
