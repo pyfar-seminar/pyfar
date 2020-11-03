@@ -25,7 +25,7 @@ You can either clone the public repository
 
 .. code-block:: console
 
-    $ git clone git@github.com:mberz/pyfar.git
+    $ git clone git@github.com:pyfar/pyfar.git
 
 or download the code as zip archive.
 
@@ -77,5 +77,5 @@ using any browser.
 inside the `docs` folder. For more information refer to the `contribution guidelines`_.
 
 
-.. _git repository: https://github.com/mberz/pyfar
+.. _git repository: https://github.com/pyfar/pyfar
 .. _`contribution guidelines`: CONTRIBUTING.rst

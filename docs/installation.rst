@@ -32,7 +32,7 @@ You can either clone the public repository:
 
 .. code-block:: console
 
-    $ git clone https://github.com/mberz/pyfar
+    $ git clone https://github.com/pyfar/pyfar
 
 Once you have a copy of the source, you can install it with:
 
@@ -41,4 +41,4 @@ Once you have a copy of the source, you can install it with:
     $ python setup.py install
 
 
-.. _Git repo: https://github.com/mberz/pyfar
+.. _Git repo: https://github.com/pyfar/pyfar
