@@ -10,5 +10,5 @@ recursive-exclude * *.py[co]
 
 recursive-include docs *.rst conf.py Makefile make.bat *.jpg *.png *.gif
 
-recursice-include pyfar/spatial/external/*
-recursice-include pyfar/plot/plotstyles/*
+recursive-include pyfar/spatial/external/*
+recursive-include pyfar/plot/plotstyles/*
