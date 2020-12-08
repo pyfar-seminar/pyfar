@@ -1,5 +1,5 @@
 import numpy as np
-from pyfar import Signal
+# from pyfar import Signal
 
 
 class FractionalSmoothing:
@@ -32,7 +32,7 @@ class FractionalSmoothing:
         else:
             raise ValueError("Invalid data type of window width (int/float)")
 
-        self._VALID_WINDOW_TYPE = ["rectangular"]
+        self._VALID_WIN_TYPE = ["rectangular"]
         if (win_type in self._VALID_WIN_TYPE) is True:
             self._win_type = win_type
         else:
@@ -47,35 +47,57 @@ class FractionalSmoothing:
         and the two arrays are combined to one. The array 'Phi' contains all
         integration limits and is stored in the FractionalSmoothing object.
         """
-        # Lower and upper cutoff frequencies for each bin k:
-        cutoff_low = self._disc_freq_bins*2**(-self._smoothing_width/2)
-        cutoff_up = self._disc_freq_bins*2**(self._smoothing_width/2)
-        # Range of frequency bins within upper and lower cutoff frequency:
-        freq_bins = np.array([
-                        np.arange(np.floor(k_c_low), np.ceil(k_c_up))
-                        for k_c_low, k_c_up in zip(cutoff_low, cutoff_up)])
-        # Replace first entry by lower cutoff frequency bin k'
-        # and substract 0.5 from other entries:
-        disc_freq_bins_low = np.array([
-                        np.concatenate((np.array([k_L]), k[1:]-.5))
-                        for k_L, k in zip(cutoff_low, freq_bins)])
-        # Replace last entry by upper cutoff frequency bin k'
-        # and add 0.5 to other entries:
-        disc_freq_bins_up = np.array([
-                        np.concatenate((k[:-1]+.5, np.array([k_U])))
-                        for k, k_U in zip(freq_bins, cutoff_up)])
-        # Divide by k and calc log:
-        disc_freq_bins_low /= self._disc_freq_bins
-        disc_freq_bins_up /= self._disc_freq_bins
-        Phi_l = np.array([np.log2(i) for i in disc_freq_bins_low])
-        Phi_u = np.array([np.log2(i) for i in disc_freq_bins_up])
-        self._Phi = np.array([Phi_l, Phi_u])
+        # Lower and upper cutoff frequencies bin for each bin k:
+        k_cutoff_low = np.floor(
+            self._disc_freq_bins*2**(
+                -self._smoothing_width/2)).astype(np.int32)
+        k_cutoff_up = np.ceil(
+            self._disc_freq_bins*2**(self._smoothing_width/2)).astype(np.int32)
+        # Combine to one element:
+        k_cutoff = np.concatenate((
+            k_cutoff_low.reshape(1, -1),
+            k_cutoff_up.reshape(1, -1),
+            self._disc_freq_bins.reshape(1, -1)
+            )).T
+
+        # Matrix with shape: 'number of freq bins' x 'max cutoff freq bin'
+        # 'max cutoff freq bin' at k_cutoff[:,1][-1]
+        # Each row stores upper or lower limits for k. freq bin
+        k_mat_up = np.array(
+            [lim_padder(k[0], k[1], k[:, 1][-1], .5) for k in k_cutoff])
+        k_mat_down = np.array(
+            [lim_padder(k[0], k[1], k[:, 1][-1], .5) for k in k_cutoff])
+        # Combine matrices
+        k_mat = np.array([k_mat_up, k_mat_down])
+
+        # Replace first and last non-zero elements
+        # by upper and lower limits of k:
+        for idx, k_i in enumerate(k_cutoff):
+            # Set upper limit [0] for k. freq bin [idx]
+            # at position of last non-zero element k_i[1]-1:
+            k_mat[0, idx, k_i[1]-1] = k_i[2]*2**(self._smoothing_width/2)
+            # Set lower limit [1] for k. freq bin [idx]
+            # at position of first non-zero element k_i[0]:
+            k_mat[1, idx, k_i[0]] = k_i[2]*2**(-self._smoothing_width/2)
+
+        # Divide by k:
+        k_mat /= np.array(
+            [np.array([k_cutoff.T[2]]*k_mat.shape[2]).T]*k_mat.shape[0])
+
+        # Apply log:
+        self._limits = np.log2(k_mat)
 
     def calc_weights(self):
+        """calc_weights [summary] TODO
+        """
         if (self._win_type == "rectangular") is True:
-            # TODO Computation: Upper - Lower / Delta
-            self._weights = np.empty(
-                [len(self._disc_freq_bins), len(self._disc_freq_bins)])
+            # Computation: Upper - Lower / Smoothing_Width
+            self._weights = (self._limits[0] - self._limits[1])
+            self._weights /= self._smoothing_width
 
     # def apply(self, signal):
-        
+
+
+# Helper function to pad array of range to specified length:
+def lim_padder(start, stop, length, add_val):
+    np.pad(np.arange(start, stop) + add_val, (start, length))
