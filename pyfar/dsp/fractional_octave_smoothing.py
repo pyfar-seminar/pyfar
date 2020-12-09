@@ -1,42 +1,66 @@
 import numpy as np
-# from pyfar import Signal
+from pyfar import Signal
 
 
 class FractionalSmoothing:
 
     def __init__(
             self,
-            sampling_rate,
+            data,
             smoothing_width,
             win_type='rectangular'):
         """__init__ Initiate FractionalSmoothing object.
 
-        :param sampling_rate: Sampling frequency of signal
-        :type sampling_rate: float, int
-        :param smoothing_width: Width of smoothing window relative to an octave
-        :type smoothing_width: float, int
-        :param win_type: Type of window applied to smooth,
-         defaults to 'rectangular'
-        :type win_type: str, optional
-        :raises ValueError: Invalid data type of sampling_rate.
-        :raises ValueError: Invalid data type of smoothing_width.
-        :raises ValueError: Invalid window type.
+        :param  data:               Raw data of the signal in the
+                                    frequency domain
+        :type   data:               ndarray, double
+        :param  sampling_rate:      Sampling frequency of signal
+        :type   sampling_rate:      float, int
+        :param  smoothing_width:    Width of smoothing window relative
+                                    to an octave
+        :type   smoothing_width:    float, int
+        :param  win_type:           Type of window applied to smooth,
+                                    defaults to 'rectangular'
+        :type   win_type:           str, optional
+        :raises ValueError:         Invalid data type of sampling_rate.
+        :raises ValueError:         Invalid data type of smoothing_width.
+        :raises ValueError:         Invalid window type.
         """
-        if isinstance(sampling_rate,  (float, int)) is True:
-            self._sampling_rate = sampling_rate
+        if isinstance(data, np.ndarray) is True:
+            if data.dtype == np.complex128:
+                # Get freq bins from signal data
+                self._n_bins = data.shape[-1]
+                # Copy signal data
+                self._data = np.atleast_2d(
+                    np.asarray(data.copy(), dtype=np.complex))
+            else:
+                raise TypeError(
+                    "ndarry must by of type: numpy.complex182.")
         else:
-            raise ValueError("Invalid data type of sampling rate (int/float)")
+            raise TypeError(
+                    "Invalid data type of input data (numpy.ndarray).")
 
         if isinstance(smoothing_width, (float, int)) is True:
             self._smoothing_width = smoothing_width
         else:
-            raise ValueError("Invalid data type of window width (int/float)")
+            raise TypeError("Invalid data type of window width (int/float).")
 
         self._VALID_WIN_TYPE = ["rectangular"]
         if (win_type in self._VALID_WIN_TYPE) is True:
             self._win_type = win_type
         else:
-            raise ValueError("Not a valid window type ('rectangular')")
+            raise TypeError("Not a valid window type ('rectangular').")
+
+    @classmethod
+    def from_signal(cls, signal, smoothing_width, win_type='rectangular'):
+        if isinstance(signal, Signal) is True:
+            return cls(
+                data=signal.freq,
+                smoothing_width=smoothing_width,
+                win_type=win_type)
+        else:
+            raise TypeError("Input data must be of type Signal.")
+
 
     def integration_limits(self):
         """integration_limits Computes integration limits for each frequency bin

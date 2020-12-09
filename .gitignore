@@ -118,3 +118,5 @@ pyfar/spatial/external/samplings_t_design*
 
 # saved plots from testing
 tests/test_plot_data/output/*.png
+
+*.sofa
