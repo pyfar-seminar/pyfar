@@ -47,15 +47,23 @@ def test_init_exceptions():
     assert str(error.value) == "Not a valid window type ('rectangular')."
 
 
-def test_from_signal():
+def DISABLED_test_smooth():
     data = np.empty((1, 1), dtype=np.complex128)
     f_s = 44100
     win_width = 1
     win_type = 'rectangular'
     signal = Signal(data, f_s, signal_type='power')
-    smoother = fs.FractionalSmoothing.from_signal(signal, win_width, win_type)
+    smoother = fs.FractionalSmoothing.smooth(signal, win_width, win_type)
     assert isinstance(smoother, fs.FractionalSmoothing)
     assert smoother._smoothing_width == win_width
     assert smoother._win_type == win_type
     assert smoother._data == signal._data
     assert smoother._n_bins == signal._n_samples
+
+
+# def DISABLED_test_calc_integration_limits():
+    # TODO:
+    # - analytically calc limits
+    # - init smoother
+    # - calc limits
+    # - compare limits
