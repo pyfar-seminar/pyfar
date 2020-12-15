@@ -1,4 +1,6 @@
 import numpy as np
+import cmath as cm
+import copy
 from pyfar import Signal
 
 
@@ -9,7 +11,8 @@ class FractionalSmoothing:
             data,
             smoothing_width,
             win_type='rectangular'):
-        """__init__ Initiate FractionalSmoothing object.
+        """__init
+        Initiate FractionalSmoothing object.
 
         :param  data:               Raw data of the signal in the
                                     frequency domain
@@ -51,41 +54,9 @@ class FractionalSmoothing:
         else:
             raise TypeError("Not a valid window type ('rectangular').")
 
-    @classmethod
-    def smooth(cls, signal, smoothing_width, win_type='rectangular'):
-        """from_signal Method to create object from signal, computes limits and
-        weights and finally applies them on signal. Returns smoothed signal.
-
-        :param signal:  Input signal to be smoothed
-        :type signal:   numpy.ndarray with np.complex128
-        :param          smoothing_width:    Width of smoothing window relative
-                                            to an octave
-        :type           smoothing_width:    float, int
-        :param          win_type:           Type of window applied to smooth,
-                                            defaults to 'rectangular'
-        :type           win_type:           str, optional
-        :raises         TypeError:          Input data must be of type Signal.
-        :return:        Object Fractional Smoothing Object
-        :rtype:         FractionalSmoothing
-        """
-        if isinstance(signal, Signal) is True:
-            # Create object
-            obj = cls(
-                data=signal.freq,
-                smoothing_width=smoothing_width,
-                win_type=win_type)
-            # Compute limits:
-            obj.calc_integration_limits()
-            # Comput weights:
-            obj.calc_weights()
-
-            # Return smoothed signal
-            return obj.apply()
-        else:
-            raise TypeError("Input data must be of type Signal.")
-
     def calc_integration_limits(self):
-        """integration_limits Computes integration limits for each frequency bin
+        """integration_limits
+        Computes integration limits for each frequency bin
         k. For each k two arrays are computed, one containing the upper, one
         containing the lower integration limits.
         The k arrays of upper and lower limits are stored in two arrays for
@@ -106,15 +77,20 @@ class FractionalSmoothing:
             zip(k_cutoff_low, k_cutoff_up)])
 
         # Divide by k:
-        k_mat /= np.array([np.array([k_i]*k_mat.shape[1])]*k_mat.shape[2])
+        k_divider = np.array([k_i]*(k_mat.shape[2]*2)).T.reshape(k_mat.shape)
+        k_mat /= k_divider
 
         # Apply log:
         self._limits = np.log2(k_mat)
 
+        # Replace all -inf and nan by zero:
+        self._limits = np.nan_to_num(self._limits, posinf=.0, neginf=.0)
+
     def calc_weights(self):
-        """calc_weights Computes integration from lower to upper limits with
+        """calc_weights
+        Computes integration from lower to upper limits with
         choosen window type.
-        'rectangular':  TODO
+        'rectangular':
         """
         if (self._win_type == "rectangular") is True:
             # Computation: Upper - Lower / Smoothing_Width
@@ -124,16 +100,17 @@ class FractionalSmoothing:
         self._weights[0, 0] = 1
 
     def apply(self):
-        """apply Apply weights to magnitude spectrum of signal and return new
-        object of type Signal with new amplitude spectrum.
+        """apply
+        Apply weights to magnitude spectrum of signal and return new
+        complex spectrum.
 
-        :return: Smoothed signal
-        :rtype: Signal
+        :return: Complex spectrum
+        :rtype: ndarray
         """
-        # new_magnitude = np.nansum(self._weights*np.abs(self._data), axis=1)
-        # TODO: Create new signal by copy and replace data of magnitude by new
-        # magnitude, then return signal
-        # return Signal(new_data, ...)
+        magnitude = np.sum(self._weights*np.abs(self._data), axis=1)
+        phase = np.angle(self._data)
+
+        return cm.rect(magnitude, phase)
 
 
 # Helper function to pad array of range to specified length:
@@ -172,3 +149,44 @@ def lim_padder(low, up, size):
     return np.concatenate((
         upper_limit.reshape(1, -1),
         lower_limit.reshape(1, -1)))
+
+
+def fractional_smooth(signal, smoothing_width, win_type='rectangular'):
+    """fractional_smooth Method to smooth a given signal.
+    Creates a object of class FractionalSmoothing to compute integration limits
+    and smoothing weights. Finally applies the weights on the input data and
+    returns smoothed signal.
+
+    :param signal:  Input signal to be smoothed
+    :type signal:   numpy.ndarray with np.complex128
+    :param          smoothing_width:    Width of smoothing window relative
+                                        to an octave
+    :type           smoothing_width:    float, int
+    :param          win_type:           Type of window applied to smooth,
+                                        defaults to 'rectangular'
+    :type           win_type:           str, optional
+    :raises         TypeError:          Input data must be of type Signal.
+    :return:        Smoothed Signal
+    :rtype:         Signal
+    """
+    if isinstance(signal, Signal) is True:
+        # Create object
+        obj = FractionalSmoothing(
+            data=signal.freq,
+            smoothing_width=smoothing_width,
+            win_type=win_type)
+        # Compute limits:
+        obj.calc_integration_limits()
+        # Compute weights:
+        obj.calc_weights()
+        # Compute smoothed magnitude spectrum
+        data = obj.apply()
+
+        # Return smoothed signal
+        return Signal(
+            data,
+            copy(signal.sampling_rate),
+            copy(signal.n_samples),
+            domain='freq')
+    else:
+        raise TypeError("Input data must be of type Signal.")
