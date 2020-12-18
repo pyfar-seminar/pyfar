@@ -9,8 +9,7 @@ class FractionalSmoothing:
     def __init__(
             self,
             data,
-            smoothing_width,
-            win_type='rectangular'):
+            smoothing_width):
         """__init
         Initiate FractionalSmoothing object.
 
@@ -22,17 +21,15 @@ class FractionalSmoothing:
         :param  smoothing_width:    Width of smoothing window relative
                                     to an octave
         :type   smoothing_width:    float, int
-        :param  win_type:           Type of window applied to smooth,
-                                    defaults to 'rectangular'
-        :type   win_type:           str, optional
         :raises TypeError:         Invalid data type of sampling_rate.
         :raises TypeError:         Invalid data type of smoothing_width.
-        :raises TypeError:         Invalid window type.
         """
         if isinstance(data, np.ndarray) is True:
             if data.dtype == np.complex128:
                 # Get number of freq bins from signal data
                 self._n_bins = data.shape[-1]
+                # Get number of channels
+                self._n_channels = data.shape[0]
                 # Copy signal data
                 self._data = np.atleast_2d(
                     np.asarray(data.copy(), dtype=np.complex))
@@ -47,12 +44,6 @@ class FractionalSmoothing:
             self._smoothing_width = smoothing_width
         else:
             raise TypeError("Invalid data type of window width (int/float).")
-
-        self._VALID_WIN_TYPE = ["rectangular"]
-        if (win_type in self._VALID_WIN_TYPE) is True:
-            self._win_type = win_type
-        else:
-            raise TypeError("Not a valid window type ('rectangular').")
 
     def calc_integration_limits(self):
         """integration_limits
@@ -70,10 +61,13 @@ class FractionalSmoothing:
         k_cutoff_low = k_i*2**(-self._smoothing_width/2)
         k_cutoff_up = k_i*2**(self._smoothing_width/2)
 
-        # Matrix with shape: 'number of freq bins' x 'number of freq bins' x 2:
-        # Each row stores upper and lower limits for k. freq bin from 0 to N-1
+        # Matrix with shape: 'number of freq bins' x 'max. cutoff bin' x 2:
+        # Each row stores upper and lower limits for k. freq bin from 0 to
+        # max. cutoff freq:
+        # k_cutoff_max = k_max*2**(self._smoothing_width/2) = k_cutoff_up[-1]
+        size = int(np.ceil(k_cutoff_up[-1]) + 1)
         k_mat = np.array([
-            lim_padder(low, up, self._n_bins) for low, up in
+            lim_padder(low, up, size) for low, up in
             zip(k_cutoff_low, k_cutoff_up)])
 
         # Divide by k:
@@ -88,14 +82,12 @@ class FractionalSmoothing:
 
     def calc_weights(self):
         """calc_weights
-        Computes integration from lower to upper limits with
-        choosen window type.
-        'rectangular':
+        Computes integration from lower to upper limits for a
+        triangular window.
         """
-        if (self._win_type == "rectangular") is True:
-            # Computation: Upper - Lower / Smoothing_Width
-            self._weights = (self._limits[:, 0] - self._limits[:, 1])
-            self._weights /= self._smoothing_width
+        # Computation: Upper - Lower / Smoothing_Width
+        self._weights = (self._limits[:, 0] - self._limits[:, 1])
+        self._weights /= self._smoothing_width
         # Set Weight for freq bin = 0 to 1 (no smoothing at 0 Hz)
         self._weights[0, 0] = 1
 
@@ -107,7 +99,29 @@ class FractionalSmoothing:
         :return: Complex spectrum
         :rtype: ndarray
         """
-        magnitude = np.sum(self._weights*np.abs(self._data), axis=1)
+        # Pad_width from difference of weights length and data length
+        pad_width = self._weights.shape[1] - self._n_bins
+        # Get size of signal that is used to calc mean value to pad:
+        # Difference between data length and start of weighting window
+        mean_size = self._n_bins - (self._weights != 0).argmax(axis=1)
+        # Add new dimension for channels
+        self._weights = np.expand_dims(self._weights, axis=0)
+        # Expand weights matrix for channels
+        self._weights = np.repeat(self._weights, self._n_channels, axis=0)
+
+        # Pad data into array of weighting matrix shape
+        # For each frequency bin k, data is padded according with
+        # specified mean. The mean is computed from all values within
+        # the range of the smoothing window of the particular frequency bin k
+        padded_data = data_padder(self._data, pad_width, mean_size)
+
+        # Multiplication of weighting and data matrix
+        # by using dot product @ and extracting diagonal with diagonal matrix
+        # of shape of input signal
+        magnitude = np.sum(self._weights*padded_data, axis=2)
+        # Remove padded samples:
+        magnitude = magnitude[:, :self._n_bins]
+        # Copy phase from original data
         phase = np.angle(self._data)
 
         return cm.rect(magnitude, phase)
@@ -151,7 +165,16 @@ def lim_padder(low, up, size):
         lower_limit.reshape(1, -1)))
 
 
-def fractional_smooth(signal, smoothing_width, win_type='rectangular'):
+# Helper function to pad data array to size of weighting matrix
+def data_padder(data, pad_wdith, mean_size):
+    padded = np.array([np.pad(
+        data, ((0, 0), (0, pad_wdith)), 'mean', stat_length=(m))
+        for m in mean_size])
+    # move channel axis to front and return
+    return np.moveaxis(padded, 1, 0)
+
+
+def fractional_smooth(signal, smoothing_width):
     """fractional_smooth Method to smooth a given signal.
     Creates a object of class FractionalSmoothing to compute integration limits
     and smoothing weights. Finally applies the weights on the input data and
@@ -162,9 +185,6 @@ def fractional_smooth(signal, smoothing_width, win_type='rectangular'):
     :param          smoothing_width:    Width of smoothing window relative
                                         to an octave
     :type           smoothing_width:    float, int
-    :param          win_type:           Type of window applied to smooth,
-                                        defaults to 'rectangular'
-    :type           win_type:           str, optional
     :raises         TypeError:          Input data must be of type Signal.
     :return:        Smoothed Signal
     :rtype:         Signal
@@ -173,8 +193,7 @@ def fractional_smooth(signal, smoothing_width, win_type='rectangular'):
         # Create object
         obj = FractionalSmoothing(
             data=signal.freq,
-            smoothing_width=smoothing_width,
-            win_type=win_type)
+            smoothing_width=smoothing_width)
         # Compute limits:
         obj.calc_integration_limits()
         # Compute weights:
