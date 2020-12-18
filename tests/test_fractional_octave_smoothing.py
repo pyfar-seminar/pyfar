@@ -42,7 +42,7 @@ def test_init_exceptions():
         error.value) == "ndarry must by of type: numpy.complex182."
 
     with pytest.raises(Exception) as error:
-        assert fs.FractionalSmoothing(data, 'str', win_type)
+        assert fs.FractionalSmoothing(data, 'str')
     assert str(error.value) == "Invalid data type of window width (int/float)."
 
 
