@@ -1,5 +1,4 @@
 import pytest
-from pytest import approx
 
 import pyfar.dsp.fractional_octave_smoothing as fs
 from pyfar import Signal
