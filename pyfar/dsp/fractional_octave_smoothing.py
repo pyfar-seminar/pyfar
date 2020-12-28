@@ -115,15 +115,14 @@ class FractionalSmoothing:
         # the range of the smoothing window of the particular frequency bin k
         padded_data = data_padder(self._data, pad_width, mean_size)
 
-        # Multiplication of weighting and data matrix
-        # by using dot product @ and extracting diagonal with diagonal matrix
-        # of shape of input signal
+        # Multiplication of weighting and data matrix along axis 2
         magnitude = np.sum(self._weights*padded_data, axis=2)
         # Remove padded samples:
         magnitude = magnitude[:, :self._n_bins]
         # Copy phase from original data
         phase = np.angle(self._data)
 
+        # Return array in cartesian form:
         return cm.rect(magnitude, phase)
 
 
@@ -174,14 +173,16 @@ def data_padder(data, pad_wdith, mean_size):
     return np.moveaxis(padded, 1, 0)
 
 
-def fractional_smooth(signal, smoothing_width):
+def frac_smooth_signal(signal, smoothing_width):
     """fractional_smooth Method to smooth a given signal.
-    Creates a object of class FractionalSmoothing to compute integration limits
-    and smoothing weights. Finally applies the weights on the input data and
-    returns smoothed signal.
+    Takes the data of a given signal of shape (n, m), where n is number of
+    channels and m length of the signal.
+    Creates an object of class FractionalSmoothing to compute integration
+    limits and smoothing weights. Finally applies the weights on the input data
+    and returns smoothed signal.
 
     :param signal:  Input signal to be smoothed
-    :type signal:   numpy.ndarray with np.complex128
+    :type signal:   Signal
     :param          smoothing_width:    Width of smoothing window relative
                                         to an octave
     :type           smoothing_width:    float, int
@@ -190,7 +191,7 @@ def fractional_smooth(signal, smoothing_width):
     :rtype:         Signal
     """
     if isinstance(signal, Signal) is True:
-        # Create object
+        # Create smoothing bject
         obj = FractionalSmoothing(
             data=signal.freq,
             smoothing_width=smoothing_width)
@@ -209,3 +210,38 @@ def fractional_smooth(signal, smoothing_width):
             domain='freq')
     else:
         raise TypeError("Input data must be of type Signal.")
+
+
+def frac_smooth_hrtf(hrtf, smoothing_width):
+    """fractional_smooth_hrtf Methode to smooth a given head related transfer
+    function (HRTF). Takes the hrtf as an numpy array of shape (n, m) or m,
+    where n is the number of channels and m is the lenght of the spectrum.
+    Creates an object of class FractionalSmoothing to compute integration
+    limits and smoothing weights. Finally applies the weights on the input data
+    and returns smoothed HRTF.
+
+    :param hrtf: Array of HRTF data in frequency domain.
+    :type hrtf: numpy.ndarray with np.complex128
+    :param          smoothing_width:    Width of smoothing window relative
+                                        to an octave
+    :type           smoothing_width:    float, int
+    :raises TypeError: Input data must be of type ndarray.
+    :return: Smoothed HRTF
+    :rtype: ndarray
+    """
+    if isinstance(hrtf, np.ndarray) is True:
+        # Check shape of hrtf:
+        if hrtf.ndim == 1:
+            # Add channel dimension if 1D:
+            hrtf.reshape(1, -1)
+        # Create smoothing object:
+        obj = FractionalSmoothing(hrtf, smoothing_width=smoothing_width)
+        # Compute limits:
+        obj.calc_integration_limits()
+        # Compute weights:
+        obj.calc_weights()
+        # Compute smoothed hrtf
+        data = obj.apply()
+        return data
+    else:
+        raise TypeError("Input data must be of type ndarray.")

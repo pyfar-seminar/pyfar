@@ -1,4 +1,5 @@
 import pytest
+from pytest import approx
 
 import pyfar.dsp.fractional_octave_smoothing as fs
 from pyfar import Signal
@@ -45,26 +46,14 @@ def test_init_exceptions():
     assert str(error.value) == "Invalid data type of window width (int/float)."
 
 
-def DISABLED_test_smooth():
-    data = np.empty((1, 1), dtype=np.complex128)
-    f_s = 44100
-    win_width = 1
-    signal = Signal(data, f_s, signal_type='power')
-    smoother = fs.FractionalSmoothing.smooth(signal, win_width)
-    assert isinstance(smoother, fs.FractionalSmoothing)
-    assert smoother._smoothing_width == win_width
-    assert smoother._data == signal._data
-    assert smoother._n_bins == signal._n_samples
-
-
 def test_calc_integration_limits():
     # 1.    Check if cutoff values correct and at correct position
     # 2.    Check if sum of cutoff values == win_width
-    # 3.    Check if diff between limits == 1
-    channel_number = 1
-    signal_length = 5      # Signal length in freq domain
-    data = np.empty((channel_number, signal_length), dtype=np.complex)
-    win_width = 1
+    # 3.    Check each limit between cutoff limits  
+    channel_number = 2
+    signal_length = 32      # Signal length in freq domain
+    data = np.ones((channel_number, signal_length), dtype=np.complex)
+    win_width = 5
     # Create smoothing object
     smoother = fs.FractionalSmoothing(data, win_width)
     # Compute integration limits
@@ -97,7 +86,41 @@ def test_calc_integration_limits():
         assert limit[1][exp_i_low_cutoff] == expected_lower_limit
         assert limit[0][exp_i_upper_cutoff] == expected_upper_limit
         # Check if sum of upper and lower limit equal win_width:
-        assert limit[exp_i_upper_cutoff][0] + abs(
-            limit[exp_i_low_cutoff][1]) == win_width
-        assert 2**(limit[exp_i_low_cutoff+1:exp_i_upper_cutoff][0])*k - 2**(
-            limit[exp_i_low_cutoff+1:exp_i_upper_cutoff][0])*k == 1
+        assert limit[0][exp_i_upper_cutoff] + abs(
+            limit[1][exp_i_low_cutoff]) == approx(win_width)
+
+        for k_ii in range(exp_i_low_cutoff+1, exp_i_upper_cutoff):
+            # Upper limit:
+            assert limit[0][k_ii] == np.log2((k_ii+.5)/k)
+            # Lower limit:
+            assert limit[1][k_ii] == np.log2((k_ii-.5)/k)
+
+
+# def DISABLED_test_calc_weights():
+# TODO
+
+
+# def DISABLED_test_apply():
+# TODO
+
+
+def DISABLED_test_smooth_signal():
+    data = np.empty((1, 1), dtype=np.complex128)
+    f_s = 44100
+    win_width = 1
+    signal = Signal(data, f_s)
+    smoothed_signal = fs.FractionalSmoothing.frac_smooth_signal(
+        signal, win_width)
+    assert isinstance(smoothed_signal, Signal)
+    assert smoothed_signal._n_samples == signal._n_samples
+    assert smoothed_signal._data.shape == signal._data.shape
+
+
+def DISABLED_test_smooth_hrtf():
+    hrtf_data = np.empty((1, 1), dtype=np.complex128)
+    win_width = 1
+    smoothed_hrtf = fs.FractionalSmoothing.frac_smooth_hrtf(
+        hrtf_data, win_width)
+    assert isinstance(smoothed_hrtf, np.ndarray)
+    assert smoothed_hrtf._n_samples == len(hrtf_data)
+    assert smoothed_hrtf._data.shape == hrtf_data.reshape(1, -1)
