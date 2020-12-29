@@ -4,9 +4,9 @@
 * [x] Methoden definieren (init, calc_integration_limits, calc_weights, apply, 
     smooth, ...)
 * [x] Attribute definieren (Fensterbreite, Abtastfrequenz, Frequenzen an der geglättet wird, Integrationsgrenzen(?), Gewichte)
+* [x] Datentypen für Gewichte und Integrationsgrenzen festlegen
+* [x] Methoden zum Smoothing anhand Signal und HRTF erstellen
 * [ ] Get-& Set-Methoden definieren
-* [ ] Datentypen für Gewichte und Integrationsgrenzen festlegen
-* [ ] Methoden zum Smoothing anhand Signal und HRTF erstellen
 
 ## Signalverarbeitung
 * [x] Paddingmethode für Smoothing am Rand des Spektrums überlegen
@@ -16,8 +16,7 @@
 
 ## Testing:
 * [x] Ctors und Error Exceptions testen
-* [ ] Verschiedene Konstruktormethoden testen 
-* [ ] Berechnung der Integrationsgrenzen 
+* [x] Berechnung der Integrationsgrenzen 
 * [ ] Berechnung der Gewichte mit analytischer Lösung vergeleichen (Dirac?)
 * [ ] Get- & Set-Methoden testen
 * [ ] Smoothing eines mehrkanaliges Eingangssignal testen

@@ -49,7 +49,7 @@ def test_init_exceptions():
 def test_calc_integration_limits():
     # 1.    Check if cutoff values correct and at correct position
     # 2.    Check if sum of cutoff values == win_width
-    # 3.    Check each limit between cutoff limits  
+    # 3.    Check each limit between cutoff limits
     channel_number = 2
     signal_length = 32      # Signal length in freq domain
     data = np.ones((channel_number, signal_length), dtype=np.complex)
