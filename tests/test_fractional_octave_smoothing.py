@@ -51,7 +51,7 @@ def test_calc_integration_limits():
     # 2.    Check if sum of cutoff values == win_width
     # 3.    Check each limit between cutoff limits
     channel_number = 2
-    signal_length = 32      # Signal length in freq domain
+    signal_length = 4100      # Signal length in freq domain
     data = np.ones((channel_number, signal_length), dtype=np.complex)
     win_width = 5
     # Create smoothing object
@@ -60,12 +60,12 @@ def test_calc_integration_limits():
     smoother.calc_integration_limits()
     # Get integration_limits
     limits = smoother._limits
-
+    
     # Check limits:
     # Freq bin zero:
     assert limits[0, :, :].all() == 0.0
     # Freq bin greater then zero:
-    for k, limit in enumerate(limits[1:]):
+    for k, limit in enumerate(limits[1:]):                                      # alternativ: enumerate(limits[1:], start=1) dann ohne k+=1
         k += 1
         k_i = np.arange(limit.shape[1])
         # Compute cutoff bin of rectangular window:
