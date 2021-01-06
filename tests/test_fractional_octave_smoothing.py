@@ -107,7 +107,8 @@ def test_calc_weights(smoother):
     expected_axis1_length = np.ceil((signal_length - 1)*2**(win_width/2)) + 1
     assert weights.shape[1] == int(expected_axis1_length)
     # Sum of weights for each bin == 1
-    assert np.array_equal(np.sum(weights, axis=1), np.full(signal_length, 1.))
+    assert np.allclose(np.sum(weights, axis=1), np.full(signal_length, 1.),
+                       atol=1e-16)
 
 
 def test_apply(smoother):
