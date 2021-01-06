@@ -140,21 +140,23 @@ def test_apply(smoother):
         assert np.sum(weights[0, k]*padded_data) == smoothed_data[0, k]
 
 
+# TODO
 def test_smooth_signal():
     data = np.empty((1, 1), dtype=np.complex128)
     f_s = 44100
     win_width = 1
     signal = Signal(data, f_s)
-    smoothed_signal = frac_smooth_signal(signal, win_width)
+    smoothed_signal = fs.frac_smooth_signal(signal, win_width)
     assert isinstance(smoothed_signal, Signal)
     assert smoothed_signal._n_samples == signal._n_samples
     assert smoothed_signal._data.shape == signal._data.shape
 
 
+# TODO
 def DISABLED_test_smooth_hrtf():
     hrtf_data = np.empty((1, 1), dtype=np.complex128)
     win_width = 1
-    smoothed_hrtf = fs.FractionalSmoothing.frac_smooth_hrtf(
+    smoothed_hrtf = fs.frac_smooth_hrtf(
         hrtf_data, win_width)
     assert isinstance(smoothed_hrtf, np.ndarray)
     assert smoothed_hrtf._n_samples == len(hrtf_data)

@@ -1,6 +1,5 @@
 import numpy as np
 import cmath as cm
-import copy
 from pyfar import Signal
 
 
@@ -132,8 +131,22 @@ class FractionalSmoothing:
         return polar2cartesian(magnitude, phase)
 
 
-# Helper function to pad array of range to specified length:
 def lim_padder(low, up, size):
+    """lim_padder Returns a 2D array of shape (2, 'size') containing a range of
+    k+.5 and k-.5 values with k increasing from 'low' to 'up' values.
+    Arrays are padded by k-1 zeros befor and size - (K+1) after.
+    First array: [0, ..., 0, k+.5, ..., K+.5, up, 0, ... ,0 ]
+    Second array: [0, ..., 0, low, k-.5, ..., K-.5, 0, ..., 0]
+
+    :param low: Lower value to start array
+    :type low: float
+    :param up: Upper value to end array
+    :type up: float
+    :param size: Total length of arrays
+    :type size: int
+    :return: Double padded array. 
+    :rtype: ndarray
+    """
     # Get rounded limits:
     # Round up for lower limit, round down for upper limits
     low_ceil = np.ceil(low)
@@ -153,24 +166,16 @@ def lim_padder(low, up, size):
     pad_front = int(upper_limit[0])
     upper_limit = np.pad(upper_limit, (pad_front, 0))
     lower_limit = np.pad(lower_limit, (pad_front, 0))
-    # Pad array back:
-    # if size is greater then array, add zeros
-    if len(upper_limit) < size:
-        upper_limit = np.pad(upper_limit, (0, size-len(upper_limit)))
-        lower_limit = np.pad(lower_limit, (0, size-len(lower_limit)))
-    # else cut away end of array, this is necessary when smoothing high freqs
-    # at end of data vector, smoothing weights are computed for k in [0, N-1]
-    # Alternative: pad data vector to fit size -> TODO
-    else:
-        upper_limit = upper_limit[:size]
-        lower_limit = lower_limit[:size]
+    # Pad array back to 'size' (length of largest smoothing window at highest
+    # frequency bin k)
+    upper_limit = np.pad(upper_limit, (0, size-len(upper_limit)))
+    lower_limit = np.pad(lower_limit, (0, size-len(lower_limit)))
     # Return upper and lower limits of k-th freq bin in one array:
     return np.concatenate((
         upper_limit.reshape(1, -1),
         lower_limit.reshape(1, -1)))
 
 
-# Helper function to pad data array to size of weighting matrix
 def data_padder(data, pad_width, mean_size):
     """data_padder Pads data array of shape (N, M) to data matrix of shape
     (N, M, M+pad_width). The output data contains M copies of the input data
@@ -200,8 +205,6 @@ def data_padder(data, pad_width, mean_size):
         raise ValueError('Data array must be 2D.')
 
 
-# Wrapper function for cmath's rect to create array of cartesian form
-# from polar form:
 def polar2cartesian(amplitude, phase):
     """polar2cartesian Converts two arrays of amplitude and phase into one array
     of complex numbers in cartesian form.
@@ -258,8 +261,8 @@ def frac_smooth_signal(signal, smoothing_width):
         # Return smoothed signal
         return Signal(
             data,
-            copy(signal.sampling_rate),
-            copy(signal.n_samples),
+            signal.sampling_rate,
+            signal.n_samples,
             domain='freq')
     else:
         raise TypeError("Input data must be of type Signal.")
