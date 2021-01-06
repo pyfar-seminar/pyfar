@@ -95,6 +95,12 @@ class FractionalSmoothing:
         """apply
         Apply weights to magnitude spectrum of signal and return new
         complex spectrum.
+        The weights matrix is repeated according to the number of channels.
+        Further, the data array is padded to fit the size of the weights
+        matrix. This is done by padding the data array for each frequency bin
+        by the mean value of the part of the data array that is overlapped by
+        the window. This is done to avoid boundary effects at the end of the
+        spectrum.
 
         :return: Complex spectrum
         :rtype: ndarray
@@ -165,17 +171,49 @@ def lim_padder(low, up, size):
 
 
 # Helper function to pad data array to size of weighting matrix
-def data_padder(data, pad_wdith, mean_size):
-    padded = np.array([np.pad(
-        data, ((0, 0), (0, pad_wdith)), 'mean', stat_length=(m))
-        for m in mean_size])
-    # move channel axis to front and return
-    return np.moveaxis(padded, 1, 0)
+def data_padder(data, pad_width, mean_size):
+    """data_padder Pads data array of shape (N, M) to data matrix of shape
+    (N, M, M+pad_width). The output data contains M copies of the input data
+    rows padded by 'pad_width' with the mean value of the last data samples.
+    The number of samples used to compute the mean for each row is specified in
+    the array 'mean_size'.
+
+    :param data: Array of shape (N, M) of the data.
+                 (N= Number of channels, M=Length of Signal)
+    :type data: ndarray
+    :param pad_wdith: Padding length
+    :type pad_wdith: int
+    :param mean_size: Array with numbers of samples used to compute the mean.
+    :type mean_size: ndarray
+    :raises ValueError: Data array must be 2D.
+    :return: Padded data matrix containing the data values and specified
+             padding value for each frequency bin.
+    :rtype: ndarray
+    """
+    if data.ndim == 2:
+        padded = np.array([np.pad(
+            data, ((0, 0), (0, pad_width)), 'mean', stat_length=(m))
+            for m in mean_size])
+        # move channel axis to front and return
+        return np.moveaxis(padded, 1, 0)
+    else:
+        raise ValueError('Data array must be 2D.')
 
 
 # Wrapper function for cmath's rect to create array of cartesian form
 # from polar form:
 def polar2cartesian(amplitude, phase):
+    """polar2cartesian Converts two arrays of amplitude and phase into one array
+    of complex numbers in cartesian form.
+
+    :param amplitude: Array of amplitude values.
+    :type amplitude: ndarray
+    :param phase: Array of phase values.
+    :type phase: ndarray
+    :raises ValueError: Arrays must have same shape
+    :return: Array of same shape as input arrays with complex numbers.
+    :rtype: ndarray
+    """
     if(amplitude.shape == phase.shape):
         input_shape = amplitude.shape
         reshaped_amplitude = amplitude.reshape(1, -1)[0]
