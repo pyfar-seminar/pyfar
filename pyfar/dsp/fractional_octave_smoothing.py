@@ -123,7 +123,7 @@ class FractionalSmoothing:
         phase = np.angle(self._data)
 
         # Return array in cartesian form:
-        return cm.rect(magnitude, phase)
+        return polar2cartesian(magnitude, phase)
 
 
 # Helper function to pad array of range to specified length:
@@ -171,6 +171,21 @@ def data_padder(data, pad_wdith, mean_size):
         for m in mean_size])
     # move channel axis to front and return
     return np.moveaxis(padded, 1, 0)
+
+
+# Wrapper function for cmath's rect to create array of cartesian form
+# from polar form:
+def polar2cartesian(amplitude, phase):
+    if(amplitude.shape == phase.shape):
+        input_shape = amplitude.shape
+        reshaped_amplitude = amplitude.reshape(1, -1)[0]
+        reshaped_phase = phase.reshape(1, -1)[0]
+        cartesian = np.array([
+                              cm.rect(a, p) for a, p in
+                              zip(reshaped_amplitude, reshaped_phase)])
+        return cartesian.reshape(input_shape)
+    else:
+        raise ValueError("Arrays must have same shapes.")
 
 
 def frac_smooth_signal(signal, smoothing_width):

@@ -7,13 +7,18 @@ import numpy as np
 
 
 @pytest.fixture
-def SetUpFractionalSmoothing():
-    channel_number = 1
-    signal_length = 10
-    data = np.empty((channel_number, signal_length), dtype=np.complex)
-    win_width = 1
-    win_type = 'rectangular'
-    return fs.FractionalSmoothing(data, win_width, win_type)
+def smoother():
+    channel_number = 2
+    signal_length = 100      # Signal length in freq domain
+    data = np.ones((channel_number, signal_length), dtype=np.complex)
+    win_width = 5
+    # Create smoothing object
+    smoother = fs.FractionalSmoothing(data, win_width)
+    # Compute integration limits
+    smoother.calc_integration_limits()
+    # Compute weights:
+    smoother.calc_weights()
+    return smoother
 
 
 def test_init():
@@ -46,32 +51,24 @@ def test_init_exceptions():
     assert str(error.value) == "Invalid data type of window width (int/float)."
 
 
-def test_calc_integration_limits():
-    # 1.    Check if cutoff values correct and at correct position
+def test_calc_integration_limits(smoother):
+    # 1.    Check if cutoff values are correct and at correct position
     # 2.    Check if sum of cutoff values == win_width
     # 3.    Check each limit between cutoff limits
-    channel_number = 2
-    signal_length = 4100      # Signal length in freq domain
-    data = np.ones((channel_number, signal_length), dtype=np.complex)
-    win_width = 5
-    # Create smoothing object
-    smoother = fs.FractionalSmoothing(data, win_width)
-    # Compute integration limits
-    smoother.calc_integration_limits()
+    # Window size
+    win_width = smoother._smoothing_width
     # Get integration_limits
     limits = smoother._limits
-    
     # Check limits:
     # Freq bin zero:
     assert limits[0, :, :].all() == 0.0
     # Freq bin greater then zero:
-    for k, limit in enumerate(limits[1:]):                                      # alternativ: enumerate(limits[1:], start=1) dann ohne k+=1
-        k += 1
-        k_i = np.arange(limit.shape[1])
+    for k, limit in enumerate(limits[1:], start=1):
         # Compute cutoff bin of rectangular window:
         expected_lower_cutoff = k*2**(-win_width/2)
         expected_upper_cutoff = k*2**(win_width/2)
         # Indices of cutoff bins in array:
+        k_i = np.arange(limit.shape[1])
         # Last element that is smaller then lower cutoff
         exp_i_low_cutoff = np.argmin(
             (k_i - .5) < expected_lower_cutoff) - 1
@@ -96,12 +93,50 @@ def test_calc_integration_limits():
             assert limit[1][k_ii] == np.log2((k_ii-.5)/k)
 
 
-# def DISABLED_test_calc_weights():
-# TODO
+def test_calc_weights(smoother):
+    # Signal length
+    signal_length = smoother._n_bins
+    # Window size
+    win_width = smoother._smoothing_width
+    # Get weights:
+    weights = smoother._weights
+    # Check size of weighting matrix:
+    assert weights.shape[0] == signal_length
+    # Expected length of axis 1:
+    # max_cutoff_bin = ceil(max_cutoff_value) + 1 (for k=0)
+    expected_axis1_length = np.ceil((signal_length - 1)*2**(win_width/2)) + 1
+    assert weights.shape[1] == int(expected_axis1_length)
+    # Sum of weights for each bin == 1
+    assert np.array_equal(np.sum(weights, axis=1), np.full(signal_length, 1.))
 
 
-# def DISABLED_test_apply():
-# TODO
+def test_apply(smoother):
+    channel_number = 1
+    signal_length = 30      # Signal length in freq domain
+    data = np.zeros((channel_number, signal_length), dtype=np.complex)
+    data[:, 3] = 1
+    win_width = 3
+    # Create smoothing object
+    smoother = fs.FractionalSmoothing(data, win_width)
+    # Compute integration limits
+    smoother.calc_integration_limits()
+    # Compute weights:
+    smoother.calc_weights()
+    # Apply
+    smoothed_data = smoother.apply()
+    weights = smoother._weights
+    # Check shape
+    assert smoothed_data.shape == data.shape
+
+    # Pad data array for multiplication:
+    # neglect padding with mean value
+    # --> boundary effects if signal size too small
+    pad_size_diff = smoother._limits.shape[-1] - data.shape[1]
+    padded_data = np.pad(data[0], (0, pad_size_diff))
+
+    # Check each freq bin:
+    for k in range(smoothed_data.shape[1]):
+        assert np.sum(weights[0, k]*padded_data) == smoothed_data[0, k]
 
 
 def DISABLED_test_smooth_signal():
