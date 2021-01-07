@@ -4,7 +4,9 @@ from pyfar import Signal
 
 
 class FractionalSmoothing:
-
+    """ Class of fractional smoothing object.
+        Object contains data of a signal and a given smoothing width.
+    """
     def __init__(
             self,
             data,
@@ -15,8 +17,6 @@ class FractionalSmoothing:
         :param  data:               Raw data of the signal in the
                                     frequency domain
         :type   data:               ndarray, double
-        :param  sampling_rate:      Sampling frequency of signal
-        :type   sampling_rate:      float, int
         :param  smoothing_width:    Width of smoothing window relative
                                     to an octave
         :type   smoothing_width:    float, int
