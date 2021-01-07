@@ -17,13 +17,15 @@
 ## Testing:
 * [x] Ctors und Error Exceptions testen
 * [x] Berechnung der Integrationsgrenzen 
-* [ ] Berechnung der Gewichte mit analytischer Lösung vergeleichen (Dirac?)
+* [x] Berechnung der Gewichte
+* [x] Berechnung des geglätteten Signals
 * [ ] Get- & Set-Methoden testen
+* [ ] Berechnung der Gewichte mit analytischer Lösung vergeleichen (Dirac?)
 * [ ] Smoothing eines mehrkanaliges Eingangssignal testen
 * [ ] Smoothing einer mehrkanaliger HRTF testen
 * [ ] Alle Methoden getestet?
 
 ## Doku:
-* [ ] Objekt dokumentieren
+* [x] Objekt dokumentieren
 * [ ] Methoden dokumentieren
 * [ ] Jupyter Notebook Tutorial schreiben
