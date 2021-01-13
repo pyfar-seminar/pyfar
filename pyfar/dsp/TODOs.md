@@ -22,12 +22,10 @@
 * [x] Berechnung der Gewichte
 * [x] Berechnung des geglätteten Signals
 * [ ] Get- & Set-Methoden testen
-* [ ] Berechnung der Gewichte mit analytischer Lösung vergeleichen (Dirac?)
-* [ ] Smoothing eines mehrkanaliges Eingangssignal testen
-* [ ] Smoothing einer mehrkanaliger HRTF testen
+* [ ] Smoothing eines mehrkanaliges Eingangssignal(HRTF) testen
 * [ ] Alle Methoden getestet?
 
 ## Doku:
 * [x] Objekt dokumentieren
-* [ ] Methoden dokumentieren
+* [x] Methoden dokumentieren
 * [ ] Jupyter Notebook Tutorial schreiben
