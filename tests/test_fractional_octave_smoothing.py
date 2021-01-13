@@ -8,46 +8,33 @@ import numpy as np
 
 @pytest.fixture
 def smoother():
-    channel_number = 2
     signal_length = 100      # Signal length in freq domain
-    data = np.ones((channel_number, signal_length), dtype=np.complex)
     win_width = 5
     # Create smoothing object
-    smoother = fs.FractionalSmoothing(data, win_width)
+    smoother = fs.FractionalSmoothing(signal_length, win_width)
     # Compute integration limits
-    smoother.calc_integration_limits()
+    limits = smoother.calc_integration_limits()
     # Compute weights:
     smoother.calc_weights()
-    return smoother
+    return smoother, limits
 
 
 def test_init():
-    channel_number = 1
     signal_length = 10
-    data = np.empty((channel_number, signal_length), dtype=np.complex)
     win_width = 1
-    smoother = fs.FractionalSmoothing(data, win_width)
+    smoother = fs.FractionalSmoothing(signal_length, win_width)
     assert isinstance(smoother, fs.FractionalSmoothing)
     assert smoother._smoothing_width == win_width
 
 
 def test_init_exceptions():
-    data = np.empty((1, 1), dtype=np.complex128)
-    wrong_ndarray_type = np.empty((1, 1), dtype=np.int)
+    signal_length = 10
     win_width = 1
     with pytest.raises(Exception) as error:
         assert fs.FractionalSmoothing('str', win_width)
-    assert str(
-        error.value) == "Invalid data type of input data (numpy.ndarray)."
-
+    assert str(error.value) == "Invalid data type of number of bins (int)."
     with pytest.raises(Exception) as error:
-        assert fs.FractionalSmoothing(
-            wrong_ndarray_type, win_width)
-    assert str(
-        error.value) == "ndarry must by of type: numpy.complex182."
-
-    with pytest.raises(Exception) as error:
-        assert fs.FractionalSmoothing(data, 'str')
+        assert fs.FractionalSmoothing(signal_length, 'str')
     assert str(error.value) == "Invalid data type of window width (int/float)."
 
 
@@ -55,10 +42,9 @@ def test_calc_integration_limits(smoother):
     # 1.    Check if cutoff values are correct and at correct position
     # 2.    Check if sum of cutoff values == win_width
     # 3.    Check each limit between cutoff limits
+    smoothing_obj, limits = smoother
     # Window size
-    win_width = smoother._smoothing_width
-    # Get integration_limits
-    limits = smoother._limits
+    win_width = smoothing_obj._smoothing_width
     # Check limits:
     # Freq bin zero:
     assert limits[0, :, :].all() == 0.0
@@ -94,12 +80,13 @@ def test_calc_integration_limits(smoother):
 
 
 def test_calc_weights(smoother):
+    smoothing_obj, limits = smoother
     # Signal length
-    signal_length = smoother._n_bins
+    signal_length = smoothing_obj._n_bins
     # Window size
-    win_width = smoother._smoothing_width
+    win_width = smoothing_obj._smoothing_width
     # Get weights:
-    weights = smoother._weights
+    weights = smoothing_obj._weights
     # Check size of weighting matrix:
     assert weights.shape[0] == signal_length
     # Expected length of axis 1:
@@ -111,20 +98,18 @@ def test_calc_weights(smoother):
                        atol=1e-16)
 
 
-def test_apply(smoother):
+def test_apply():
     channel_number = 1
     signal_length = 30      # Signal length in freq domain
     data = np.zeros((channel_number, signal_length), dtype=np.complex)
     data[:, 3] = 1
     win_width = 3
     # Create smoothing object
-    smoother = fs.FractionalSmoothing(data, win_width)
-    # Compute integration limits
-    smoother.calc_integration_limits()
+    smoother = fs.FractionalSmoothing(signal_length, win_width)
     # Compute weights:
     smoother.calc_weights()
     # Apply
-    smoothed_data = smoother.apply()
+    smoothed_data = smoother.apply(data)
     weights = smoother._weights
     # Check shape
     assert smoothed_data.shape == data.shape
@@ -132,7 +117,7 @@ def test_apply(smoother):
     # Pad data array for multiplication:
     # neglect padding with mean value
     # --> boundary effects if signal size too small
-    pad_size_diff = smoother._limits.shape[-1] - data.shape[1]
+    pad_size_diff = weights.shape[-1] - data.shape[1]
     padded_data = np.pad(data[0], (0, pad_size_diff))
 
     # Check each freq bin:
