@@ -19,11 +19,10 @@
 * [x] Berechnung der Integrationsgrenzen 
 * [ ] Berechnung der Gewichte mit analytischer Lösung vergeleichen (Dirac?)
 * [ ] Get- & Set-Methoden testen
-* [ ] Smoothing eines mehrkanaliges Eingangssignal testen
-* [ ] Smoothing einer mehrkanaliger HRTF testen
+* [ ] Smoothing eines mehrkanaliges Eingangssignal(HRTF) testen
 * [ ] Alle Methoden getestet?
 
 ## Doku:
-* [ ] Objekt dokumentieren
-* [ ] Methoden dokumentieren
+* [x] Objekt dokumentieren
+* [x] Methoden dokumentieren
 * [ ] Jupyter Notebook Tutorial schreiben
