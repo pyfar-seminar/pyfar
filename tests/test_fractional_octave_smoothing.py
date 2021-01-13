@@ -150,14 +150,3 @@ def test_smooth_signal():
     assert isinstance(smoothed_signal, Signal)
     assert smoothed_signal._n_samples == signal._n_samples
     assert smoothed_signal._data.shape == signal._data.shape
-
-
-# TODO
-def DISABLED_test_smooth_hrtf():
-    hrtf_data = np.empty((1, 1), dtype=np.complex128)
-    win_width = 1
-    smoothed_hrtf = fs.frac_smooth_hrtf(
-        hrtf_data, win_width)
-    assert isinstance(smoothed_hrtf, np.ndarray)
-    assert smoothed_hrtf._n_samples == len(hrtf_data)
-    assert smoothed_hrtf._data.shape == hrtf_data.reshape(1, -1)
