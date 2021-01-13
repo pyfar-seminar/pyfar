@@ -7,6 +7,8 @@
 * [x] Datentypen für Gewichte und Integrationsgrenzen festlegen
 * [x] Methoden zum Smoothing anhand Signal und HRTF erstellen
 * [ ] Get-& Set-Methoden definieren
+* [ ] Möglichkeit neue Daten zu übergeben einbauen
+* [ ] Möglichkeit Fensterbreite zu ändern einbauen
 
 ## Signalverarbeitung
 * [x] Paddingmethode für Smoothing am Rand des Spektrums überlegen
@@ -17,13 +19,15 @@
 ## Testing:
 * [x] Ctors und Error Exceptions testen
 * [x] Berechnung der Integrationsgrenzen 
-* [ ] Berechnung der Gewichte mit analytischer Lösung vergeleichen (Dirac?)
+* [x] Berechnung der Gewichte
+* [x] Berechnung des geglätteten Signals
 * [ ] Get- & Set-Methoden testen
+* [ ] Berechnung der Gewichte mit analytischer Lösung vergeleichen (Dirac?)
 * [ ] Smoothing eines mehrkanaliges Eingangssignal testen
 * [ ] Smoothing einer mehrkanaliger HRTF testen
 * [ ] Alle Methoden getestet?
 
 ## Doku:
-* [ ] Objekt dokumentieren
+* [x] Objekt dokumentieren
 * [ ] Methoden dokumentieren
 * [ ] Jupyter Notebook Tutorial schreiben

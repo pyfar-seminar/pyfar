@@ -144,7 +144,7 @@ def lim_padder(low, up, size):
     :type up: float
     :param size: Total length of arrays
     :type size: int
-    :return: Double padded array. 
+    :return: Double padded array.
     :rtype: ndarray
     """
     # Get rounded limits:
