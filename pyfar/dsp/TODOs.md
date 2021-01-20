@@ -22,7 +22,7 @@
 * [x] Berechnung der Integrationsgrenzen 
 * [ ] Integrationsgrenzen mit analytischer Lösung vergleichen (für einen Frequenzstützstelle)
 * [x] Berechnung der Gewichte
-* [ ] Gewichte mit analytischer Lösung vergleichen (für einen Frequenzstützstelle)
+* [x] Gewichte mit analytischer Lösung vergleichen (für einen Frequenzstützstelle)
 * [x] Berechnung des geglätteten Signals
 * [ ] Get- & Set-Methoden testen
 * [ ] Smoothing eines mehrkanaliges Eingangssignal(HRTF) testen
