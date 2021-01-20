@@ -105,12 +105,39 @@ def test_calc_weights(smoother):
                        atol=1e-16)
 
 
+def test_weights_k10():
+    signal_length = 100      # Signal length in freq domain
+    # Check weight for k=10, win_width = 1
+    win_width = 1
+    # Create smoothing object
+    smoother_k10 = fs.FractionalSmoothing(signal_length, win_width)
+    # Compute weights:
+    smoother_k10.calc_weights()
+    weights_k10 = (smoother_k10._weights).toarray()
+    k = 10
+    # k*2^(-win_width) <= k' <= k*2^(win_width/2):
+    k_min = k*2**(-win_width/2)
+    k_max = k*2**(win_width/2)
+    k_i = np.arange(int(np.floor(k_min)), int(np.ceil(k_max)))
+    # phi(k,k' +/- .5) = log_2((k' +/- .5)/k) (Eq. 17)
+    phi_up = np.log2((k_i+.5)/k)
+    phi_low = np.log2((k_i-.5)/k)
+    # Replace lowest/highest phi by phi_min/phi_max:
+    phi_up[-1] = np.log2(k_max/k)
+    phi_low[0] = np.log2(k_min/k)
+    # Weights W[k=10, k'] = (phi_up - phi_low)/win_width
+    # (Integral over rectangular window)
+    expected_weights_k10 = (phi_up - phi_low)/win_width
+    for i, w in enumerate(expected_weights_k10):
+        assert w == weights_k10[10, i+k_i[0]]
+
+
 def test_apply():
     channels = 1
     signal_length = 30      # Signal length in freq domain
     data = np.zeros((channels, signal_length), dtype=np.complex)
     data[:, 3] = 1
-    win_width = 3
+    win_width = 1
     # Create smoothing object
     smoother = fs.FractionalSmoothing(signal_length, win_width)
     # Compute weights:
