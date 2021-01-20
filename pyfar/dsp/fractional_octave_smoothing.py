@@ -1,5 +1,6 @@
 import numpy as np
 import cmath as cm
+import scipy.sparse as sparse
 from pyfar import Signal
 
 
@@ -70,7 +71,9 @@ class FractionalSmoothing:
         # Apply log:
         limits = np.log2(k_mat)
         # Replace all -inf and nan by zero:
-        return np.nan_to_num(limits, posinf=.0, neginf=.0)
+        limits = np.nan_to_num(limits, posinf=.0, neginf=.0)
+        # Convert limits matrix to csr matrices
+        return sparse.csr_matrix(limits[:, 0]), sparse.csr_matrix(limits[:, 1])
 
     def calc_weights(self):
         """calc_weights
@@ -84,10 +87,8 @@ class FractionalSmoothing:
         # Get limits:
         limits = self.calc_integration_limits()
         # Computation: Upper - Lower / Smoothing_Width and store in array
-        self._weights = (limits[:, 0] - limits[:, 1])
+        self._weights = limits[0] - limits[1]
         self._weights /= self._smoothing_width
-        # Set Weight for freq bin = 0 to 1 (no smoothing at 0 Hz)
-        self._weights[0, 0] = 1
 
     def apply(self, data):
         """
@@ -132,22 +133,26 @@ class FractionalSmoothing:
         n_channels = data.shape[0]
         # Copy signal data
         data = np.atleast_2d(np.asarray(data.copy(), dtype=np.complex))
+        # Convert weights to dense matrix:
+        weights = self._weights.todense()
+        # Set Weight for freq bin = 0 to 1 (no smoothing at 0 Hz)
+        weights[0, 0] = 1
         # Pad_width from difference of weights length and data length
-        pad_width = self._weights.shape[1] - self._n_bins
+        pad_width = weights.shape[1] - self._n_bins
         # Get size of signal that is used to calc mean value to pad:
         # Difference between data length and start of weighting window
-        mean_size = self._n_bins - (self._weights != 0).argmax(axis=1)
+        mean_size = self._n_bins - (weights != 0).argmax(axis=1)
         # Add new dimension for channels
-        self._weights = np.expand_dims(self._weights, axis=0)
+        weights = np.expand_dims(weights, axis=0)
         # Expand weights matrix for channels
-        self._weights = np.repeat(self._weights, n_channels, axis=0)
+        weights = np.repeat(weights, n_channels, axis=0)
         # Pad data into array of weighting matrix shape
         # For each frequency bin k, data is padded according with
         # specified mean. The mean is computed from all values within
         # the range of the smoothing window of the particular frequency bin k
         padded_data = data_padder(data, pad_width, mean_size)
         # Multiplication of weighting and data matrix along axis 2
-        magnitude = np.sum(self._weights*padded_data, axis=2)
+        magnitude = np.sum(weights*padded_data, axis=2)
         # Remove padded samples:
         magnitude = magnitude[:, :self._n_bins]
         # Copy phase from original data
