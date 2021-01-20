@@ -9,6 +9,7 @@
 * [ ] Get-& Set-Methoden definieren
 * [ ] Möglichkeit neue Daten zu übergeben einbauen
 * [ ] Möglichkeit Fensterbreite zu ändern einbauen
+* [ ] Limits Matrix mit scipy.sparse bauen (prüfen) 
 
 ## Signalverarbeitung
 * [x] Paddingmethode für Smoothing am Rand des Spektrums überlegen
@@ -19,7 +20,9 @@
 ## Testing:
 * [x] Ctors und Error Exceptions testen
 * [x] Berechnung der Integrationsgrenzen 
+* [ ] Integrationsgrenzen mit analytischer Lösung vergleichen (für einen Frequenzstützstelle)
 * [x] Berechnung der Gewichte
+* [ ] Gewichte mit analytischer Lösung vergleichen (für einen Frequenzstützstelle)
 * [x] Berechnung des geglätteten Signals
 * [ ] Get- & Set-Methoden testen
 * [ ] Smoothing eines mehrkanaliges Eingangssignal(HRTF) testen

@@ -133,7 +133,7 @@ class FractionalSmoothing:
         n_channels = data.shape[0]
         # Copy signal data
         data = np.atleast_2d(np.asarray(data.copy(), dtype=np.complex))
-        # Convert weights to dense matrix:
+        # Convert weights to array:
         weights = self._weights.todense()
         # Set Weight for freq bin = 0 to 1 (no smoothing at 0 Hz)
         weights[0, 0] = 1

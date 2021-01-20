@@ -43,6 +43,10 @@ def test_calc_integration_limits(smoother):
     # 2.    Check if sum of cutoff values == win_width
     # 3.    Check each limit between cutoff limits
     smoothing_obj, limits = smoother
+    # Transform limits to dense matrix:
+    limits = np.array([limits[0].toarray(), limits[1].toarray()])
+    # Swap axis to make iteration easier:
+    limits = limits.swapaxes(0, 1)
     # Window size
     win_width = smoothing_obj._smoothing_width
     # Check limits:
@@ -80,28 +84,31 @@ def test_calc_integration_limits(smoother):
 
 
 def test_calc_weights(smoother):
-    smoothing_obj, limits = smoother
+    smoothing_obj, _ = smoother
     # Signal length
     signal_length = smoothing_obj._n_bins
     # Window size
     win_width = smoothing_obj._smoothing_width
     # Get weights:
-    weights = smoothing_obj._weights
+    weights = (smoothing_obj._weights).toarray()
     # Check size of weighting matrix:
     assert weights.shape[0] == signal_length
     # Expected length of axis 1:
     # max_cutoff_bin = ceil(max_cutoff_value) + 1 (for k=0)
     expected_axis1_length = np.ceil((signal_length - 1)*2**(win_width/2)) + 1
     assert weights.shape[1] == int(expected_axis1_length)
+    # Frequency bin k=0: no weights
+    assert np.sum(weights[0]) == 0
     # Sum of weights for each bin == 1
-    assert np.allclose(np.sum(weights, axis=1), np.full(signal_length, 1.),
+    assert np.allclose(np.sum(weights[1:], axis=1),
+                       np.full(signal_length-1, 1.),
                        atol=1e-16)
 
 
 def test_apply():
-    channel_number = 1
+    channels = 1
     signal_length = 30      # Signal length in freq domain
-    data = np.zeros((channel_number, signal_length), dtype=np.complex)
+    data = np.zeros((channels, signal_length), dtype=np.complex)
     data[:, 3] = 1
     win_width = 3
     # Create smoothing object
@@ -110,7 +117,9 @@ def test_apply():
     smoother.calc_weights()
     # Apply
     smoothed_data = smoother.apply(data)
-    weights = smoother._weights
+    # Convert to array
+    weights = (smoother._weights).toarray()
+    weights[0, 0] = 1
     # Check shape
     assert smoothed_data.shape == data.shape
 
@@ -122,7 +131,7 @@ def test_apply():
 
     # Check each freq bin:
     for k in range(smoothed_data.shape[1]):
-        assert np.sum(weights[0, k]*padded_data) == smoothed_data[0, k]
+        assert np.sum(weights[k, :]*padded_data) == smoothed_data[0, k]
 
 
 # TODO
