@@ -1,7 +1,6 @@
 import numpy as np
 import cmath as cm
 from pyfar import Signal
-from numpy.core.fromnumeric import _prod_dispatcher
 import scipy.sparse as sparse
 # from pyfar import Signal
 
@@ -40,9 +39,6 @@ class FractionalSmoothing:
             raise TypeError("Invalid data type of number of bins (int).")
         self._VALID_PHASE_TYPE = [
             "original", "zero", "minimum", "linear"]
-        if phase_type not in self._VALID_PHASE_TYPE:
-            raise TypeError("Phase type must be one of the following: \
-                            'original', 'zero', 'minimum', 'linear'.")
 
         # Set number of freq bins
         self._n_bins = n_bins
@@ -184,10 +180,10 @@ class FractionalSmoothing:
         dst_magn = dst_magn[:, :self.n_bins]
 
         # Phase handling:
-        if self.phase_type == 'original':
+        if self.phase_type == 'Original':
             # Copy phase from original data
             dst_phase = np.angle(data_buffer)
-        if self.phase_type == 'zero':
+        if self.phase_type == 'Zero':
             # Copy phase from original data
             dst_phase = np.zeros_like(data_buffer)
         else:

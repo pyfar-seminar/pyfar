@@ -190,7 +190,7 @@ def spectrogram(signal, dB=True, log_prefix=20, log_reference=1,
     return frequencies, times, spectrogram
 
 
-def fract_oct_smooth(src, smoothing_width):
+def fract_oct_smooth(src, smoothing_width, phase_type=None):
     """
     Smooth magnitude spectrum of a signal with fractional octave width
     according to _[1].
@@ -229,7 +229,7 @@ def fract_oct_smooth(src, smoothing_width):
     if not isinstance(src, Signal):
         raise TypeError("Input data must be of type Signal.")
     # Create smoothing bject
-    obj = fs.FractionalSmoothing(src.n_bins, smoothing_width)
+    obj = fs.FractionalSmoothing(src.n_bins, smoothing_width, phase_type)
     # Compute weights:
     obj.calc_weights()
     # Return smoothed signal
