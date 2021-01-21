@@ -2,6 +2,7 @@ import numpy as np
 from scipy import signal as sgn
 from pyfar import Signal
 import pyfar.fft as fft
+import pyfar.dsp.fractional_octave_smoothing as fs
 
 
 def phase(signal, deg=False, unwrap=False):
@@ -187,3 +188,49 @@ def spectrogram(signal, dB=True, log_prefix=20, log_reference=1,
     times -= times[0]
 
     return frequencies, times, spectrogram
+
+
+def fract_oct_smooth(src, smoothing_width):
+    """
+    Smooth magnitude spectrum of a signal with fractional octave width
+    according to _[1].
+
+    Takes the data of a given signal of shape (n, m), where n is number of
+    channels and m length of the signal.
+    Creates an object of class FractionalSmoothing to compute smoothing weights
+    and to apply them on the input data. Returns a smoothed signal.
+
+    To avoid boundery effect at the edge of the spectrum, the signal data is
+    padded to fit the window size.
+    See pyfar.fractional_octave_smoothing.data_padder and
+    pyfar.fractional_octave_smoothing.apply for further information on the
+    signal padding.
+
+    Parameters
+    ----------
+    src : Signal
+        Input signal to be smoothed
+    smoothing_width : float, int
+        Width of smoothing window relative to an octave
+
+    Returns
+    -------
+    Signal
+        Smoothed Signal
+
+    References
+    ----------
+    .. [1] JO. G.. Tylka, BR. B.. Boren, and ED. Y.. Choueiri,
+           "A Generalized Method for Fractional-Octave Smoothing of Transfer
+           Functions that Preserves Log-Frequency Symmetry,"
+           J. Audio Eng. Soc., vol. 65, no. 3, pp. 239-245, (2017 March.).
+           doi: https://doi.org/10.17743/jaes.2016.0053
+    """
+    if not isinstance(src, Signal):
+        raise TypeError("Input data must be of type Signal.")
+    # Create smoothing bject
+    obj = fs.FractionalSmoothing(src.n_bins, smoothing_width)
+    # Compute weights:
+    obj.calc_weights()
+    # Return smoothed signal
+    return obj.apply(src)
