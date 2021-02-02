@@ -190,13 +190,11 @@ def spectrogram(signal, dB=True, log_prefix=20, log_reference=1,
     return frequencies, times, spectrogram
 
 
-def fract_oct_smooth(src, smoothing_width, phase_type=None):
+def fract_oct_smooth(src, smoothing_width, n_bins=None, phase_type=None):
     """
     Smooth magnitude spectrum of a signal with fractional octave width
-    according to _[1].
+    according to _[1]. If no signal is given, smoothing object is returned.
 
-    Takes the data of a given signal of shape (n, m), where n is number of
-    channels and m length of the signal.
     Creates an object of class FractionalSmoothing to compute smoothing weights
     and to apply them on the input data. Returns a smoothed signal.
 
@@ -212,6 +210,10 @@ def fract_oct_smooth(src, smoothing_width, phase_type=None):
         Input signal to be smoothed
     smoothing_width : float, int
         Width of smoothing window relative to an octave
+    n_bins : int, default None.
+        Number of frequency bins of signal.
+    phase_type : str, default None
+        Phase handling specifier. `None` to return signal with zero phase.
 
     Returns
     -------
@@ -220,17 +222,22 @@ def fract_oct_smooth(src, smoothing_width, phase_type=None):
 
     References
     ----------
-    .. [1] JO. G.. Tylka, BR. B.. Boren, and ED. Y.. Choueiri,
+    .. [1] J. G. Tylka, B. B. Boren, and E. Y. Choueiri,
            "A Generalized Method for Fractional-Octave Smoothing of Transfer
            Functions that Preserves Log-Frequency Symmetry,"
            J. Audio Eng. Soc., vol. 65, no. 3, pp. 239-245, (2017 March.).
            doi: https://doi.org/10.17743/jaes.2016.0053
     """
-    if not isinstance(src, Signal):
+    if (src is None and n_bins is None) or \
+       (src is not None and n_bins is not None):
+        raise ValueError('Either signal or n_bins must be none.')
+
+    if (src is not None and not isinstance(src, Signal)):
         raise TypeError("Input data must be of type Signal.")
-    # Create smoothing bject
+    # Generate object
     obj = fs.FractionalSmoothing(src.n_bins, smoothing_width, phase_type)
-    # Compute weights:
-    obj.calc_weights()
-    # Return smoothed signal
-    return obj.apply(src)
+    # If signal is given: return smoothed object
+    if src is not None:
+        return obj.apply(src)
+    else:
+        return obj

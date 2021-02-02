@@ -1,3 +1,4 @@
+from pyfar.spatial import samplings
 import pytest
 from pytest import approx
 
@@ -29,7 +30,7 @@ def test_init():
     assert isinstance(smoother, fs.FractionalSmoothing)
     assert smoother.smoothing_width == win_width
 
-
+# TODO: init exceptions phase type einbauen
 def test_init_exceptions():
     signal_length = 10
     win_width = 1
@@ -135,18 +136,24 @@ def test_weights_k10():
         assert w == weights_k10[10, i+k_i[0]]
 
 
-def DISABLED_test_apply():
+def test_apply():
+    # Source signal:
     channels = 1
     signal_length = 30      # Signal length in freq domain
     data = np.zeros((channels, signal_length), dtype=np.complex)
     data[:, 3] = 1
-    win_width = 1
+    sampling_rate = 44100
+    src_signal = Signal(data, sampling_rate, domain='freq')
+    
     # Create smoothing object
+    win_width = 1
     smoother = fs.FractionalSmoothing(signal_length, win_width)
     # Compute weights:
     smoother.calc_weights()
     # Apply
-    smoothed_data = smoother.apply(data)
+    smoothed_signal = smoother.apply(src_signal)
+    smoothed_data = smoothed_signal.freq
+
     # Convert to array
     weights = (smoother._weights).toarray()
     weights[0, 0] = 1

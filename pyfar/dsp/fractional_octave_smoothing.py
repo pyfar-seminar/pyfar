@@ -1,5 +1,4 @@
 import numpy as np
-import cmath as cm
 from pyfar import Signal
 import scipy.sparse as sparse
 # from pyfar import Signal
@@ -32,6 +31,10 @@ class FractionalSmoothing:
         smoothing_width : float, int
             Width of smoothing window relative to an octave.
             E.g.: smoothing_width=1/3 denotes third-octave smoothing.
+        phase_type : str, default None.
+            Phase type specifier: If `None` or `zero`, signal with zero phase
+            is returned. `original` copies phase from input signal.
+            TODO: other phase types.
         """
         if not isinstance(smoothing_width, (float, int)):
             raise TypeError("Invalid data type of window width (int/float).")
@@ -44,6 +47,10 @@ class FractionalSmoothing:
         self._n_bins = n_bins
         # Set smoothing width:
         self._smoothing_width = smoothing_width
+        # Calc weights:
+        self.calc_weights()
+        # Set update weight flag to False
+        self._update_weigths = False
         # Set default phase type to Zero
         if not phase_type:
             self._phase_type = 'Zero'
@@ -55,8 +62,8 @@ class FractionalSmoothing:
         Compute integration limits for each frequency bin as in eq. (17) in
         _[1].
 
-        For each k two arrays are computed, one containing the upper, one
-        containing the lower integration limits.
+        For each frequency bin k two arrays are computed, one containing the
+        upper, one containing the lower integration limits.
         The k arrays of upper and lower limits are stored in two arrays for
         upper and lower limits. Finally, the log2 on all elements is computed
         and the two arrays are combined to one.
@@ -151,6 +158,12 @@ class FractionalSmoothing:
         # Get signal data:
         data_buffer = signal_buffer.freq.copy()
 
+        # Check if weights need to be updated:
+        if self._update_weigths:
+            # Update weights
+            self.calc_weights()
+            # Reset flag
+            self._update_weigths = False
         # Prepare weighting matrix:
         # Convert weights to array:
         weights = self._weights.todense()
@@ -186,12 +199,12 @@ class FractionalSmoothing:
         if self.phase_type == 'Zero':
             # Copy phase from original data
             dst_phase = np.zeros_like(data_buffer)
+        # TODO: other phase types.
         else:
             raise ValueError("Invalid Phase type given.")
 
         # Convert array in cartesian form:
-        dst_data = polar2cartesian(dst_magn, dst_phase)
-
+        dst_data = dst_magn * np.exp(1j * dst_phase)
         # Return smoothed reshaped signal
         return Signal(dst_data, src.sampling_rate, src.n_samples, 'freq',
                       src.fft_norm, src.dtype, src.comment).reshape(src.cshape)
@@ -227,8 +240,8 @@ class FractionalSmoothing:
             raise TypeError("Invalid data type of number of bins (int).")
         # Get number of freq bins
         self.n_bins = n_bins
-        # Update weights:
-        self.calc_weights()
+        # Update weight flag to True:
+        self._update_weigths = True
 
     @property
     def smoothing_width(self):
@@ -263,8 +276,8 @@ class FractionalSmoothing:
             raise TypeError("Invalid data type of window width (int/float).")
         # Save smoothing width:
         self.smoothing_width = smoothing_width
-        # Update weights:
-        self.calc_weights()
+        # Update weight flag to True:
+        self._update_weigths = True
 
     @property
     def phase_type(self):
@@ -386,38 +399,3 @@ class FractionalSmoothing:
                                   stat_length=(m)) for m in mean_size])
         # move channel axis to front and return
         return np.moveaxis(padded, 1, 0)
-
-
-def polar2cartesian(amplitude, phase):
-    """
-    Converts two arrays of amplitude and phase into one array
-    of complex numbers in cartesian form.
-
-    Parameters
-    ----------
-    amplitude : ndarray
-        Array of amplitude values.
-    phase : ndarray
-        Array of phase values.
-
-    Returns
-    -------
-    ndarray
-        Array of same shape as input arrays with complex numbers.
-
-    Raises
-    ------
-    ValueError
-        Arrays must have same shape.
-    """
-    if not (amplitude.shape == phase.shape):
-        raise ValueError("Arrays must have same shapes.")
-    # Save input shape
-    input_shape = amplitude.shape
-    # Reshape for cmath rect to 1D arrays:
-    reshaped_amplitude = amplitude.reshape(1, -1)[0]
-    reshaped_phase = phase.reshape(1, -1)[0]
-    # Apply cmath rect on elements:
-    cartesian = np.array([cm.rect(a, p) for a, p in
-                          zip(reshaped_amplitude, reshaped_phase)])
-    return cartesian.reshape(input_shape)
