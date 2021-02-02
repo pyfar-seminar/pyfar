@@ -41,7 +41,7 @@ class FractionalSmoothing:
         if not isinstance(n_bins, int):
             raise TypeError("Invalid data type of number of bins (int).")
         self._VALID_PHASE_TYPE = [
-            "original", "zero", "minimum", "linear"]
+            "Original", "Zero", "Minimum", "Linear"]
 
         # Set number of freq bins
         self._n_bins = n_bins
@@ -144,8 +144,9 @@ class FractionalSmoothing:
         if not isinstance(src, Signal):
             raise TypeError("Invalid src input type (Signal).")
         if not src.n_bins == self.n_bins:
-            raise ValueError("Input signal must have same number of frequency \
-                              bins as set in smoothing object")
+            raise ValueError("Input signal must have same number of frequencies \
+                              bins as set in smoothing object. Set number of \
+                              frequencies with obj.n_bins.")
 
         # Prepare source signal:
         # Copy flattened signal to buffer:

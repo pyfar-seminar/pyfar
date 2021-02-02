@@ -15,7 +15,7 @@
 * [ ] ``Phase types: minimum, linear``` hinzufügen
     ### Ctors:
     * [ ] Konstruktor mit Signal (ohne n_bins), ohne Signal (mit n_bins)
-    * [ ] Fractional Smoothing Objekt ohne Signal initalisieren und zurückgeben, analog zu Filter Funktionen
+    * [x] Fractional Smoothing Objekt ohne Signal initalisieren und zurückgeben, analog zu Filter Funktionen
     * [ ] Möglichkeit neue Daten zu übergeben einbauen
 
 

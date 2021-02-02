@@ -181,3 +181,18 @@ def test_smooth_signal():
     assert isinstance(smoothed_signal, Signal)
     assert smoothed_signal._n_samples == signal._n_samples
     assert smoothed_signal._data.shape == signal._data.shape
+
+# TODO
+def DISABLED_test_phase_handling():
+    shape = (4, 9, 10)
+    src_magn = np.ones(shape)
+    src_phase = np.full(shape, np.pi)
+    f_s = 44100
+    win_width = 1
+    signal = Signal(src_magn*np.exp(1j*src_phase), f_s, domain='freq')
+    output_zero_phase = dsp.fract_oct_smooth(signal, win_width, n_bins=None,
+                                             phase_type='Zero')
+    output_orig_phase = dsp.fract_oct_smooth(signal, win_width, n_bins=None,
+                                             phase_type='Original')
+    assert np.array_equal(np.angle(output_zero_phase.freq), np.zeros(shape))
+    assert np.array_equal(np.angle(output_orig_phase.freq), src_phase)
