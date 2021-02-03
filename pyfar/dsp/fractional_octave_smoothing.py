@@ -42,6 +42,8 @@ class FractionalSmoothing:
             raise TypeError("Invalid data type of number of bins (int).")
         self._VALID_PHASE_TYPE = [
             "Original", "Zero", "Minimum", "Linear"]
+        if phase_type is not None and phase_type not in self._VALID_PHASE_TYPE:
+            raise TypeError("Invalid phase type.")
 
         # Set number of freq bins
         self._n_bins = n_bins
@@ -197,7 +199,7 @@ class FractionalSmoothing:
         if self.phase_type == 'Original':
             # Copy phase from original data
             dst_phase = np.angle(data_buffer)
-        if self.phase_type == 'Zero':
+        elif self.phase_type == 'Zero':
             # Copy phase from original data
             dst_phase = np.zeros_like(data_buffer)
         # TODO: other phase types.

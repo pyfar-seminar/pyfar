@@ -1,4 +1,3 @@
-from pyfar.spatial import samplings
 import pytest
 from pytest import approx
 
@@ -30,7 +29,7 @@ def test_init():
     assert isinstance(smoother, fs.FractionalSmoothing)
     assert smoother.smoothing_width == win_width
 
-# TODO: init exceptions phase type einbauen
+
 def test_init_exceptions():
     signal_length = 10
     win_width = 1
@@ -40,6 +39,9 @@ def test_init_exceptions():
     with pytest.raises(Exception) as error:
         assert fs.FractionalSmoothing(signal_length, 'str')
     assert str(error.value) == "Invalid data type of window width (int/float)."
+    with pytest.raises(Exception) as error:
+        assert fs.FractionalSmoothing(signal_length, win_width, 'str')
+    assert str(error.value) == "Invalid phase type."
 
 
 def test_calc_integration_limits(smoother):
@@ -144,7 +146,7 @@ def test_apply():
     data[:, 3] = 1
     sampling_rate = 44100
     src_signal = Signal(data, sampling_rate, domain='freq')
-    
+
     # Create smoothing object
     win_width = 1
     smoother = fs.FractionalSmoothing(signal_length, win_width)
@@ -177,13 +179,14 @@ def test_smooth_signal():
     f_s = 44100
     win_width = 1
     signal = Signal(data, f_s, domain='freq')
-    smoothed_signal = dsp.fract_oct_smooth(signal, win_width)
+    smoothed_signal = dsp.fract_oct_smooth(signal, win_width,
+                                           phase_type='Zero')
     assert isinstance(smoothed_signal, Signal)
     assert smoothed_signal._n_samples == signal._n_samples
     assert smoothed_signal._data.shape == signal._data.shape
 
-# TODO
-def DISABLED_test_phase_handling():
+
+def test_phase_handling():
     shape = (4, 9, 10)
     src_magn = np.ones(shape)
     src_phase = np.full(shape, np.pi)
@@ -196,3 +199,7 @@ def DISABLED_test_phase_handling():
                                              phase_type='Original')
     assert np.array_equal(np.angle(output_zero_phase.freq), np.zeros(shape))
     assert np.array_equal(np.angle(output_orig_phase.freq), src_phase)
+    with pytest.raises(Exception) as error:
+        assert dsp.fract_oct_smooth(signal, win_width, n_bins=None,
+                                    phase_type='Invalid')
+    assert str(error.value) == "Invalid phase type."
