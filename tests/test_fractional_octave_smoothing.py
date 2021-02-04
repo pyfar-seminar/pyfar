@@ -11,7 +11,7 @@ import numpy as np
 def smoother():
     signal_length = 100      # Signal length in freq domain
     win_width = 5
-    phase_type = 'zero'
+    phase_type = 'Zero'
     # Create smoothing object
     smoother = fs.FractionalSmoothing(signal_length, win_width, phase_type)
     # Compute integration limits
@@ -24,7 +24,7 @@ def smoother():
 def test_init():
     signal_length = 10
     win_width = 1
-    phase_type = 'zero'
+    phase_type = 'Zero'
     smoother = fs.FractionalSmoothing(signal_length, win_width, phase_type)
     assert isinstance(smoother, fs.FractionalSmoothing)
     assert smoother.smoothing_width == win_width
@@ -175,15 +175,23 @@ def test_apply():
 
 # TODO
 def test_smooth_signal():
-    data = np.empty((4, 9, 10), dtype=np.complex128)
-    f_s = 44100
+    # Signal: 2kHz sine
+    f_s = 100
+    f_sin = 10
+    dur = 1
+    sine = np.atleast_2d(np.sin(2 * np.pi * f_sin * np.arange(dur*f_s) / f_s))
+    src = Signal(sine, fs, n_samples=sine.size)
+    # Kopie: src_copy = src oder src_copy = src.copy ?
+    src_copy = src.copy()
+    # Smoothind width
     win_width = 1
-    signal = Signal(data, f_s, domain='freq')
-    smoothed_signal = dsp.fract_oct_smooth(signal, win_width,
-                                           phase_type='Zero')
+    smoothed_signal = dsp.fract_oct_smooth(src.copy(), win_width, phase_type='Zero')
+    # Check if return type is correct:
     assert isinstance(smoothed_signal, Signal)
-    assert smoothed_signal._n_samples == signal._n_samples
-    assert smoothed_signal._data.shape == signal._data.shape
+    # Check metadata:
+    assert smoothed_signal._assert_matching_meta_data(src)
+    # Check if input signal has changed:
+    assert src == src_copy
 
 
 def test_phase_handling():
@@ -203,3 +211,43 @@ def test_phase_handling():
         assert dsp.fract_oct_smooth(signal, win_width, n_bins=None,
                                     phase_type='Invalid')
     assert str(error.value) == "Invalid phase type."
+
+
+def test_n_bins_setter(smoother):
+    smoothing_obj, _ = smoother
+    # Weights update should be False
+    assert smoothing_obj._update_weigths is False
+    # Initial number bins
+    old_n_bins = smoothing_obj.n_bins
+    # New number bins
+    new_n_bins = 10*old_n_bins
+    smoothing_obj.n_bins = new_n_bins
+    assert smoothing_obj.n_bins == new_n_bins
+    assert smoothing_obj._update_weigths is True
+
+
+def test_smoothing_width_setter(smoother):
+    smoothing_obj, _ = smoother
+    # Weights update should be False
+    assert smoothing_obj._update_weigths is False
+    # Initial number bins
+    old_smoothing_width = smoothing_obj.smoothing_width
+    # New number bins
+    new_smoothing_width = 10*old_smoothing_width
+    smoothing_obj.smoothing_width = new_smoothing_width
+    assert smoothing_obj.smoothing_width == new_smoothing_width
+    assert smoothing_obj._update_weigths is True
+
+
+def test_phase_setter_setter(smoother):
+    smoothing_obj, _ = smoother
+    # Weights update should be False
+    assert smoothing_obj._update_weigths is False
+    # Initial number bins
+    old_phase_type = smoothing_obj.phase_type
+    # New number bins
+    new_phase_type = 'Original'
+    smoothing_obj.phase_type = new_phase_type
+    assert new_phase_type != old_phase_type
+    assert smoothing_obj.phase_type == new_phase_type
+    assert smoothing_obj._update_weigths is False

@@ -152,9 +152,12 @@ class FractionalSmoothing:
 
         # Prepare source signal:
         # Copy flattened signal to buffer:
-        signal_buffer = src.flatten()
+        if src.cshape != (1,):
+            signal_buffer = src.flatten()
+        else:
+             signal_buffer = src.copy()
         # Set buffer signal to frequency domain
-        if not signal_buffer.domain == 'freq':
+        if signal_buffer.domain != 'freq':
             signal_buffer.domain = 'freq'
         # Set FFT norm for input signal to "none":
         signal_buffer.fft_norm = 'none'
@@ -208,9 +211,13 @@ class FractionalSmoothing:
 
         # Convert array in cartesian form:
         dst_data = dst_magn * np.exp(1j * dst_phase)
+        # Create return object:
+        dst = Signal(dst_data, src.sampling_rate, src.n_samples, 'freq',
+                     'none', src.dtype, src.comment).reshape(src.cshape)
+        # Set fft norm as in src:
+        dst.fft_norm = src.fft_norm
         # Return smoothed reshaped signal
-        return Signal(dst_data, src.sampling_rate, src.n_samples, 'freq',
-                      src.fft_norm, src.dtype, src.comment).reshape(src.cshape)
+        return dst.reshape(src.cshape)
 
     @property
     def n_bins(self):
@@ -241,10 +248,11 @@ class FractionalSmoothing:
         """
         if not isinstance(n_bins, int):
             raise TypeError("Invalid data type of number of bins (int).")
-        # Get number of freq bins
-        self.n_bins = n_bins
-        # Update weight flag to True:
-        self._update_weigths = True
+        if self._n_bins != n_bins:
+            # Get number of freq bins
+            self._n_bins = n_bins
+            # Update weight flag to True:
+            self._update_weigths = True
 
     @property
     def smoothing_width(self):
@@ -277,10 +285,11 @@ class FractionalSmoothing:
         """
         if not isinstance(smoothing_width, (float, int)):
             raise TypeError("Invalid data type of window width (int/float).")
-        # Save smoothing width:
-        self.smoothing_width = smoothing_width
-        # Update weight flag to True:
-        self._update_weigths = True
+        if self._smoothing_width != smoothing_width:
+            # Save smoothing width:
+            self._smoothing_width = smoothing_width
+            # Update weight flag to True:
+            self._update_weigths = True
 
     @property
     def phase_type(self):
@@ -313,7 +322,7 @@ class FractionalSmoothing:
             raise TypeError("Phase type must be one of the following: \
                             'original', 'zero', 'minimum', 'linear'.")
         # Save phase type:
-        self.phase_type = phase_type
+        self._phase_type = phase_type
 
     @staticmethod
     def lim_padder(low, up, size):

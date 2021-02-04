@@ -13,6 +13,11 @@
 * [x] Esetze `polar2cartesian`
 * [ ] Limits Matrix mit scipy.sparse bauen (prüfen)
 * [ ] ``Phase types: minimum, linear``` hinzufügen
+* [ ] Gewichtung über loop für jedes Frequenzbin
+
+    ### Padding Alternativen:
+    * [ ] Spektrum mit konstantem Wert padden (Mittelwert über letztes Fenster nutzen)
+    * [ ] Vergleich Zero, Mean und Const Padding in Notebook darstellen
     ### Ctors:
     * [ ] Konstruktor mit Signal (ohne n_bins), ohne Signal (mit n_bins)
     * [x] Fractional Smoothing Objekt ohne Signal initalisieren und zurückgeben, analog zu Filter Funktionen
@@ -34,20 +39,20 @@
 * [x] apply() Test fixen (Signal als input und return)
     ### Test for `apply()` method:
     * [ ] Smoothing eines mehrkanaliges Eingangssignal(HRTF) testen
-    * [ ] Test, ob Gewichte nur auf Magnitude oder auch auf Phase angewendet werden
-    * [ ] Test check phase handling: Original vs Zero
+    * [x] Test, ob Gewichte nur auf Magnitude oder auch auf Phase angewendet werden
+    * [x] Test check phase handling: Original vs Zero
     * [ ] Test, ob input signal verändert wird durch smoothing Objekt
     * [ ] Test to check if the meta-data of the output signal matches that of the input signal
     * [ ] Test, ob weights matrix neu berechnet wird
     ### Error Exceptions:
-    * [ ] Ctors und Error Exceptions updaten
+    * [x] Ctors und Error Exceptions updaten
     * [ ] Test Errors in calc_integration limits
     * [ ] Test Errors in `apply()` und Signal in time domain
 
     ### Get- & Set-Methoden testen:
-    * [ ] Test n_bins setter
-    * [ ] Test smoothing_width setter
-    * [ ] Test phase type setter
+    * [x] Test n_bins setter
+    * [x] Test smoothing_width setter
+    * [x] Test phase type setter
     * [ ] Test Error in data_padder
 ---
 * [ ] Alle Methoden getestet: ```pytest --cov=. --cov-report=html```
