@@ -62,3 +62,7 @@
 * [x] Formelreferenzen hinzufügen
 * [x] Methoden dokumentieren
 * [ ] Jupyter Notebook Tutorial schreiben
+
+    ### Inhalt Jupyter Notebook:
+    * Unterscheid Padding Methoden
+    * Unterschied smoothing per Matrix vs smoothing per Loop

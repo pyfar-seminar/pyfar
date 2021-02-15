@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.core.shape_base import atleast_2d
 from pyfar import Signal
 import scipy.sparse as sparse
 # from pyfar import Signal
@@ -10,7 +11,7 @@ class FractionalSmoothing:
 
         References
         ----------
-        .. [1] JO. G.. Tylka, BR. B.. Boren, and ED. Y.. Choueiri,
+        .. [1] JO. G. Tylka, BR. B. Boren, and ED. Y. Choueiri,
                "A Generalized Method for Fractional-Octave Smoothing of
                Transfer Functions that Preserves Log-Frequency Symmetry,"
                J. Audio Eng. Soc., vol. 65, no. 3, pp. 239-245, (2017 March.).
@@ -118,6 +119,35 @@ class FractionalSmoothing:
         self._weights = limits[0] - limits[1]
         self._weights /= self.smoothing_width
 
+    def calc_weights_new(self):
+
+        # Eq. (17) - log integration limits
+        # phi_low and phi_high are largely identical - calculation could be
+        # made more efficient
+        k_max = int(np.ceil((self._n_bins-1)*2**(self.smoothing_width/2)) + 1)
+        k = np.atleast_2d(np.arange(k_max))
+        phi_low = np.log2((k.T - .5) / k[:, :self._n_bins])
+        phi_high = np.log2((k.T + .5) / k[:, :self._n_bins])
+
+        # Eq. (15) - window function at all phi
+        w_phi_low = (phi_low + self.smoothing_width/2) / self.smoothing_width
+        w_phi_low[phi_low < -self.smoothing_width/2] = 0
+        w_phi_low[phi_low > self.smoothing_width/2] = 1
+
+        w_phi_high = (phi_high + self.smoothing_width/2) / self.smoothing_width
+        w_phi_high[phi_high < -self.smoothing_width/2] = 0
+        w_phi_high[phi_high > self.smoothing_width/2] = 1
+
+        # Eq (16) - weights
+        W = w_phi_high - w_phi_low
+        W[0] = 0        # fix NaNs for k=0
+        W[0, 0] = 1
+
+        # Transpose to fit old implementation:
+        W = W.T
+        # as sparse matrix
+        self._weights = sparse.csr_matrix(W)
+
     def apply(self, src):
         """
         Apply weights to magnitude spectrum of signal and return new signal
@@ -155,7 +185,7 @@ class FractionalSmoothing:
         if src.cshape != (1,):
             signal_buffer = src.flatten()
         else:
-             signal_buffer = src.copy()
+            signal_buffer = src.copy()
         # Set buffer signal to frequency domain
         if signal_buffer.domain != 'freq':
             signal_buffer.domain = 'freq'

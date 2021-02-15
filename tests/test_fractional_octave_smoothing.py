@@ -97,6 +97,9 @@ def test_calc_weights(smoother):
     win_width = smoothing_obj.smoothing_width
     # Get weights:
     weights = (smoothing_obj._weights).toarray()
+    # Get weights: (new_method)
+    smoothing_obj.calc_weights_new()
+    new_weights = (smoothing_obj._weights).toarray()
     # Check size of weighting matrix:
     assert weights.shape[0] == signal_length
     # Expected length of axis 1:
@@ -109,7 +112,7 @@ def test_calc_weights(smoother):
     assert np.allclose(np.sum(weights[1:], axis=1),
                        np.full(signal_length-1, 1.),
                        atol=1e-16)
-
+    assert np.allclose(weights, new_weights, atol=1e-16)
 
 def test_weights_k10():
     signal_length = 100      # Signal length in freq domain
