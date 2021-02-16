@@ -16,7 +16,7 @@
 * [x] Gewichtung über loop für jedes Frequenzbin
 
     ### Padding Alternativen:
-    * [ ] Spektrum mit konstantem Wert padden (Mittelwert über letztes Fenster nutzen)
+    * [x] Spektrum mit konstantem Wert padden (Mittelwert über letztes Fenster nutzen)
     * [ ] Vergleich Zero, Mean und Const Padding in Notebook darstellen
     * [ ] Evtl. Mean Padding Möglichkeit in Loop Methoed einbauen
     ### Ctors:
@@ -38,6 +38,7 @@
 * [x] Gewichte mit analytischer Lösung vergleichen (für einen Frequenzstützstelle)
 * [x] Berechnung des geglätteten Signals
 * [x] apply() Test fixen (Signal als input und return)
+* [ ] Padding Type testen
     ### Test for `apply()` method:
     * [ ] Smoothing eines mehrkanaliges Eingangssignal(HRTF) testen
     * [x] Test, ob Gewichte nur auf Magnitude oder auch auf Phase angewendet werden

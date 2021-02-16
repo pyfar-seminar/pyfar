@@ -222,10 +222,14 @@ class FractionalSmoothing:
             ki = np.arange(k_max+1)-.5
             # Min k' = k*2^(-win/2)
             ki_min = k*2**(-self.smoothing_width/2)
-            ki_max = k*2**(self.smoothing_width/2)
+            # Replace all entries smaller then minimum by minimum
             ki[ki < ki_min] = ki_min
+            # Max k' = k*2^(win/2)
+            ki_max = k*2**(self.smoothing_width/2)
+            # Replace all entries greater then maximum by maximum
             ki[ki > ki_max] = ki_max
             # Solving integral eq. (16)
+            # (log2(ki+.5) - log2(ki-.5)) / smoothing_width
             W = np.ediff1d(np.log2(ki))/self.smoothing_width
             # Apply weights of freq bin k:
             dst_magn[k] = np.sum(W*src_magn_padded)
@@ -326,15 +330,9 @@ class FractionalSmoothing:
         weights = np.expand_dims(weights, axis=0)
         # Expand weights matrix for src data
         weights = np.repeat(weights, src_data_copy.shape[0], axis=0)
-
         # Prepare source signal data:
-        # Pad data into array of weighting matrix shape
-        # For each frequency bin k, data is padded according with
-        # specified mean. The mean is computed from all values within
-        # the range of the smoothing window of the particular frequency bin k
-        src_magn_padded = self.data_padder(np.abs(src_data_copy),
-                                           pad_width,
-                                           mean_size)
+        src_magn_padded = self.data_padder(np.abs(src_data_copy), pad_width,
+                                           mean_size, self._padding_type)
         # Multiplication of weighting and data matrix along axis 2
         dst_magn = np.sum(weights*src_magn_padded, axis=2)
 
@@ -524,10 +522,10 @@ class FractionalSmoothing:
             lower_limit.reshape(1, -1)))
 
     @staticmethod
-    def data_padder(data, pad_width, mean_size):
+    def data_padder(data, pad_width, mean_size, padding_type):
         """
         Pads data array of shape (N, M) to data matrix of shape
-        (N, M, M+pad_width). The output data contains M copies of the input
+        (N, N, M+pad_width). The output data contains M copies of the input
         data rows padded by 'pad_width' with the mean value of the last data
         samples. The number of samples used to compute the mean for each row is
         specified in the array 'mean_size'.
@@ -541,6 +539,7 @@ class FractionalSmoothing:
             Padding length
         mean_size : ndarray
             Array with numbers of samples used to compute the mean.
+        padding_type : PaddingType
 
         Returns
         -------
@@ -555,7 +554,24 @@ class FractionalSmoothing:
         """
         if not data.ndim == 2:
             raise ValueError('Data array must be 2D.')
-        padded = np.array([np.pad(data, ((0, 0), (0, pad_width)), 'mean',
-                                  stat_length=(m)) for m in mean_size])
+        if padding_type == PaddingType.MEAN:
+            # Pad data into array of weighting matrix shape
+            # For each frequency bin k, data is padded according with
+            # specified mean. The mean is computed from all values within the
+            # range of the smoothing window of the particular frequency bin k
+            padded = np.array([np.pad(data, ((0, 0), (0, pad_width)), 'mean',
+                                      stat_length=(m)) for m in mean_size])
+        elif padding_type == PaddingType.EDGE:
+            padded = np.array([np.pad(np.abs(data),
+                                      ((0, 0), (0, pad_width)), 'edge')
+                               for m in mean_size])
+        elif padding_type == PaddingType.ZERO:
+            padded = np.array([np.pad(np.abs(data),
+                                      ((0, 0), (0, pad_width)), 'constant',
+                                      (0, 0)) for m in mean_size])
+        else:
+            raise ValueError(
+                'PaddingType.MEAN not implemented for loop method.')
+
         # move channel axis to front and return
         return np.moveaxis(padded, 1, 0)
