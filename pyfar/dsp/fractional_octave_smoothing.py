@@ -1,8 +1,21 @@
+from enum import Enum
 import numpy as np
-from numpy.core.shape_base import atleast_2d
 from pyfar import Signal
 import scipy.sparse as sparse
 # from pyfar import Signal
+
+
+class PhaseType(Enum):
+    ZERO = 0
+    ORIGINAL = 1
+    MINIMUM = 2
+    LINEAR = 3
+
+
+class PaddingType(Enum):
+    ZERO = 0
+    EDGE = 1
+    MEAN = 2
 
 
 class FractionalSmoothing:
@@ -17,11 +30,13 @@ class FractionalSmoothing:
                J. Audio Eng. Soc., vol. 65, no. 3, pp. 239-245, (2017 March.).
                doi: https://doi.org/10.17743/jaes.2016.0053
     """
+
     def __init__(
             self,
             n_bins,
             smoothing_width,
-            phase_type=None):
+            phase_type=PhaseType.ZERO,
+            padding_type=PaddingType.MEAN):
         """
         Initiate FractionalSmoothing object.
 
@@ -32,33 +47,36 @@ class FractionalSmoothing:
         smoothing_width : float, int
             Width of smoothing window relative to an octave.
             E.g.: smoothing_width=1/3 denotes third-octave smoothing.
-        phase_type : str, default None.
-            Phase type specifier: If `None` or `zero`, signal with zero phase
-            is returned. `original` copies phase from input signal.
+        phase_type : PhaseType
+            Phase type specifier: Default is PhaseType.ZERO: signal with zero
+            phase is returned. PhaseType.ORIGINAL copies phase from input
+            signal.
             TODO: other phase types.
+        padding_tye : PaddingType
+            Specify how to pad signal spectrum, when smoothing window is larger
+            then greatest frequency. 
         """
         if not isinstance(smoothing_width, (float, int)):
             raise TypeError("Invalid data type of window width (int/float).")
         if not isinstance(n_bins, int):
             raise TypeError("Invalid data type of number of bins (int).")
-        self._VALID_PHASE_TYPE = [
-            "Original", "Zero", "Minimum", "Linear"]
-        if phase_type is not None and phase_type not in self._VALID_PHASE_TYPE:
+        if not isinstance(phase_type, PhaseType):
             raise TypeError("Invalid phase type.")
+        if not isinstance(padding_type, PaddingType):
+            raise TypeError("Invalid padding type.")
 
         # Set number of freq bins
         self._n_bins = n_bins
         # Set smoothing width:
         self._smoothing_width = smoothing_width
+        # Set phase type:
+        self._phase_type = phase_type
+        # Set padding type:
+        self._padding_type = padding_type
         # Calc weights:
         self.calc_weights()
         # Set update weight flag to False
         self._update_weigths = False
-        # Set default phase type to Zero
-        if not phase_type:
-            self._phase_type = 'Zero'
-        else:
-            self._phase_type = phase_type
 
     def calc_integration_limits(self):
         """
@@ -89,7 +107,8 @@ class FractionalSmoothing:
         # Each row stores upper and lower limits for k. freq bin from 0 to
         # max. cutoff freq:
         # k_cutoff_max = k_max*2**(self.smoothing_width/2) = k_cutoff_up[-1]
-        size = int(np.ceil(k_cutoff_up[-1]) + 1)
+        # TODO: Warum +1?
+        size = int(np.ceil(k_cutoff_up[-1])+1)
         k_mat = np.array([
             self.lim_padder(low, up, size) for low, up in
             zip(k_cutoff_low, k_cutoff_up)])
@@ -116,15 +135,18 @@ class FractionalSmoothing:
         # Get limits:
         limits = self.calc_integration_limits()
         # Computation: Upper - Lower / Smoothing_Width and store in array
-        self._weights = limits[0] - limits[1]
-        self._weights /= self.smoothing_width
+        W = limits[0] - limits[1]
+        W /= self.smoothing_width
+        # Set Weight for freq bin = 0 to 1 (no smoothing at 0 Hz)
+        W[0, 0] = 1
+        self._weights = sparse.csr_matrix(W)
 
     def calc_weights_new(self):
 
         # Eq. (17) - log integration limits
         # phi_low and phi_high are largely identical - calculation could be
         # made more efficient
-        k_max = int(np.ceil((self._n_bins-1)*2**(self.smoothing_width/2)) + 1)
+        k_max = int(np.ceil((self._n_bins-1)*2**(self.smoothing_width/2)))
         k = np.atleast_2d(np.arange(k_max))
         phi_low = np.log2((k.T - .5) / k[:, :self._n_bins])
         phi_high = np.log2((k.T + .5) / k[:, :self._n_bins])
@@ -147,6 +169,95 @@ class FractionalSmoothing:
         W = W.T
         # as sparse matrix
         self._weights = sparse.csr_matrix(W)
+
+    def apply_via_loop(self, src):
+
+        if not isinstance(src, Signal):
+            raise TypeError("Invalid src input type (Signal).")
+        if not src.n_bins == self.n_bins:
+            raise ValueError("Input signal must have same number of frequencies \
+                              bins as set in smoothing object. Set number of \
+                              frequencies with obj.n_bins.")
+
+        # Prepare source signal:
+        # Copy flattened signal to buffer:
+        if src.cshape != (1,):
+            src_copy = src.flatten()
+        else:
+            src_copy = src.copy()
+        # Set buffer signal to frequency domain
+        if src_copy.domain != 'freq':
+            src_copy.domain = 'freq'
+        # Set FFT norm for input signal to "none":
+        src_copy.fft_norm = 'none'
+        # Get signal data:
+        src_data_copy = src_copy.freq.copy()
+
+        # -----------------------------------------------------------------------
+        # Smoothing by loop:
+
+        # Max smoothing bin:
+        k_max = int(np.ceil(src.n_bins*2**(self.smoothing_width/2)))
+
+        # Pad signal to fit max window length:
+        pad_length = k_max - src.n_bins
+        if self._padding_type == PaddingType.EDGE:
+            src_magn_padded = np.pad(np.abs(src_data_copy),
+                                     ((0, 0), (0, pad_length)), 'edge')
+        elif self._padding_type == PaddingType.ZERO:
+            src_magn_padded = np.pad(np.abs(src_data_copy),
+                                     ((0, 0), (0, pad_length)), 'zero')
+        else:
+            raise ValueError(
+                'PaddingType.MEAN not implemented for loop method.')
+
+        # Empty dst magnitude array:
+        dst_magn = np.empty_like(src_data_copy)
+
+        # Loop over frequencies, skip k=0
+        dst_magn[0] = np.abs(src_data_copy[0])
+        for k in range(1, src.n_bins):
+            # ki array lenght +1 to fit size after np.ediff1d
+            # ki = k'-0.5 = [-.5, .5, 1.5, ... k_max-.5]
+            ki = np.arange(k_max+1)-.5
+            # Min k' = k*2^(-win/2)
+            ki_min = k*2**(-self.smoothing_width/2)
+            ki_max = k*2**(self.smoothing_width/2)
+            ki[ki < ki_min] = ki_min
+            ki[ki > ki_max] = ki_max
+            # Solving integral eq. (16)
+            W = np.ediff1d(np.log2(ki))/self.smoothing_width
+            # Apply weights of freq bin k:
+            dst_magn[k] = np.sum(W*src_magn_padded)
+        # -----------------------------------------------------------------------
+
+        # Remove padded samples:
+        dst_magn = dst_magn[:, :self.n_bins]
+
+        # Phase handling:
+        if self.phase_type == PhaseType.ORIGINAL:
+            # Copy phase from original data
+            dst_phase = np.angle(src_data_copy)
+        elif self.phase_type == PhaseType.ZERO:
+            # Copy phase from original data
+            dst_phase = np.zeros_like(src_data_copy)
+        # TODO: other phase types.
+        elif self.phase_type == PhaseType.MINIMUM:
+            raise ValueError("PhaseType.MINIMUM is not implemented.")
+        elif self.phase_type == PhaseType.LINEAR:
+            raise ValueError("PhaseType.LINEAR is not implemented.")
+        else:
+            raise ValueError("Invalid phase type.")
+
+        # Convert array in cartesian form:
+        dst_data = dst_magn * np.exp(1j * dst_phase)
+        # Create return object:
+        dst = Signal(dst_data, src.sampling_rate, src.n_samples, 'freq',
+                     'none', src.dtype, src.comment).reshape(src.cshape)
+        # Set fft norm as in src:
+        dst.fft_norm = src.fft_norm
+        # Return smoothed reshaped signal
+        return dst.reshape(src.cshape)
 
     def apply(self, src):
         """
@@ -183,16 +294,19 @@ class FractionalSmoothing:
         # Prepare source signal:
         # Copy flattened signal to buffer:
         if src.cshape != (1,):
-            signal_buffer = src.flatten()
+            src_copy = src.flatten()
         else:
-            signal_buffer = src.copy()
+            src_copy = src.copy()
         # Set buffer signal to frequency domain
-        if signal_buffer.domain != 'freq':
-            signal_buffer.domain = 'freq'
+        if src_copy.domain != 'freq':
+            src_copy.domain = 'freq'
         # Set FFT norm for input signal to "none":
-        signal_buffer.fft_norm = 'none'
+        src_copy.fft_norm = 'none'
         # Get signal data:
-        data_buffer = signal_buffer.freq.copy()
+        src_data_copy = src_copy.freq.copy()
+
+        # -----------------------------------------------------------------------
+        # Smoothing with matrix:
 
         # Check if weights need to be updated:
         if self._update_weigths:
@@ -203,8 +317,6 @@ class FractionalSmoothing:
         # Prepare weighting matrix:
         # Convert weights to array:
         weights = self._weights.todense()
-        # Set Weight for freq bin = 0 to 1 (no smoothing at 0 Hz)
-        weights[0, 0] = 1
         # Pad_width from difference of weights length and data length
         pad_width = weights.shape[1] - self.n_bins
         # Get size of signal that is used to calc mean value to pad:
@@ -213,31 +325,38 @@ class FractionalSmoothing:
         # Add new dimension for channels
         weights = np.expand_dims(weights, axis=0)
         # Expand weights matrix for src data
-        weights = np.repeat(weights, data_buffer.shape[0], axis=0)
+        weights = np.repeat(weights, src_data_copy.shape[0], axis=0)
 
         # Prepare source signal data:
         # Pad data into array of weighting matrix shape
         # For each frequency bin k, data is padded according with
         # specified mean. The mean is computed from all values within
         # the range of the smoothing window of the particular frequency bin k
-        magn_buffer = self.data_padder(np.abs(data_buffer),
-                                       pad_width,
-                                       mean_size)
+        src_magn_padded = self.data_padder(np.abs(src_data_copy),
+                                           pad_width,
+                                           mean_size)
         # Multiplication of weighting and data matrix along axis 2
-        dst_magn = np.sum(weights*magn_buffer, axis=2)
+        dst_magn = np.sum(weights*src_magn_padded, axis=2)
+
+        # -----------------------------------------------------------------------
+
         # Remove padded samples:
         dst_magn = dst_magn[:, :self.n_bins]
 
         # Phase handling:
-        if self.phase_type == 'Original':
+        if self.phase_type == PhaseType.ORIGINAL:
             # Copy phase from original data
-            dst_phase = np.angle(data_buffer)
-        elif self.phase_type == 'Zero':
+            dst_phase = np.angle(src_data_copy)
+        elif self.phase_type == PhaseType.ZERO:
             # Copy phase from original data
-            dst_phase = np.zeros_like(data_buffer)
+            dst_phase = np.zeros_like(src_data_copy)
         # TODO: other phase types.
+        elif self.phase_type == PhaseType.MINIMUM:
+            raise ValueError("PhaseType.MINIMUM is not implemented.")
+        elif self.phase_type == PhaseType.LINEAR:
+            raise ValueError("PhaseType.LINEAR is not implemented.")
         else:
-            raise ValueError("Invalid Phase type given.")
+            raise ValueError("Invalid phase type.")
 
         # Convert array in cartesian form:
         dst_data = dst_magn * np.exp(1j * dst_phase)
@@ -326,14 +445,14 @@ class FractionalSmoothing:
         """phase_type
         Specify how to treate phase of signal.
 
-        'original'  Use phase of input signal.
-        'zero'      Set phase of smoothed singal to zero.
-        'minimum'   TODO
-        'linear'    TODO
+        ORIGINAL  Use phase of input signal.
+        ZERO      Set phase of smoothed singal to zero.
+        MINIMUM   TODO
+        LINEAR    TODO
 
         Returns
         -------
-        _VALID_PHASE_TYPE
+        PhaseType
             Phase type
         """
         return self._phase_type
@@ -348,9 +467,8 @@ class FractionalSmoothing:
         phase_type : _VALID_PHASE_TYPE
             Phase type
         """
-        if phase_type not in self._VALID_PHASE_TYPE:
-            raise TypeError("Phase type must be one of the following: \
-                            'original', 'zero', 'minimum', 'linear'.")
+        if not isinstance(phase_type, PhaseType):
+            raise TypeError("Invalid phase type.")
         # Save phase type:
         self._phase_type = phase_type
 

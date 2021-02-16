@@ -11,7 +11,7 @@ import numpy as np
 def smoother():
     signal_length = 100      # Signal length in freq domain
     win_width = 5
-    phase_type = 'Zero'
+    phase_type = fs.PhaseType.ZERO
     # Create smoothing object
     smoother = fs.FractionalSmoothing(signal_length, win_width, phase_type)
     # Compute integration limits
@@ -24,7 +24,7 @@ def smoother():
 def test_init():
     signal_length = 10
     win_width = 1
-    phase_type = 'Zero'
+    phase_type = fs.PhaseType.ZERO
     smoother = fs.FractionalSmoothing(signal_length, win_width, phase_type)
     assert isinstance(smoother, fs.FractionalSmoothing)
     assert smoother.smoothing_width == win_width
@@ -97,22 +97,22 @@ def test_calc_weights(smoother):
     win_width = smoothing_obj.smoothing_width
     # Get weights:
     weights = (smoothing_obj._weights).toarray()
-    # Get weights: (new_method)
-    smoothing_obj.calc_weights_new()
-    new_weights = (smoothing_obj._weights).toarray()
     # Check size of weighting matrix:
     assert weights.shape[0] == signal_length
     # Expected length of axis 1:
     # max_cutoff_bin = ceil(max_cutoff_value) + 1 (for k=0)
-    expected_axis1_length = np.ceil((signal_length - 1)*2**(win_width/2)) + 1
+    expected_axis1_length = np.ceil((signal_length - 1)*2**(win_width/2)+1)
     assert weights.shape[1] == int(expected_axis1_length)
-    # Frequency bin k=0: no weights
-    assert np.sum(weights[0]) == 0
+    # Frequency bin k= 0 and k'= 0:
+    assert weights[0, 0] == 1
     # Sum of weights for each bin == 1
-    assert np.allclose(np.sum(weights[1:], axis=1),
-                       np.full(signal_length-1, 1.),
+    # TODO:
+    # Sum for weights[1] and weights[2] do not equal 1, becuause of
+    # missing intervall from phi(k'_min) to phi(0.5)
+    assert np.allclose(np.sum(weights, axis=1),
+                       np.ones(signal_length),
                        atol=1e-16)
-    assert np.allclose(weights, new_weights, atol=1e-16)
+
 
 def test_weights_k10():
     signal_length = 100      # Signal length in freq domain
@@ -139,6 +139,30 @@ def test_weights_k10():
     expected_weights_k10 = (phi_up - phi_low)/win_width
     for i, w in enumerate(expected_weights_k10):
         assert w == weights_k10[10, i+k_i[0]]
+
+
+def test_loop_method():
+    signal_length = 100      # Signal length in freq domain
+    win_width = 5
+    phase_type = fs.PhaseType.ZERO
+    # Create smoothing object
+    smoother = fs.FractionalSmoothing(signal_length, win_width, phase_type)
+    weights = smoother._weights.toarray()
+
+    # Pad signal to fit max window length:
+    k_max = int(np.ceil((signal_length-1)*2**(win_width/2))+1)
+    W = np.zeros((signal_length, k_max))
+
+    for k in range(signal_length):
+        ki = np.arange(k_max+1)-.5
+        ki_min = k*2**(-win_width/2)
+        ki_max = k*2**(win_width/2)
+        ki[ki < ki_min] = ki_min
+        ki[ki > ki_max] = ki_max
+        W[k] = np.ediff1d(np.log2(ki))/win_width
+    W[0] = 0
+    W[0, 0] = 1
+    assert np.allclose(weights, W, atol=1e-15)
 
 
 def test_apply():
@@ -177,7 +201,7 @@ def test_apply():
 
 
 # TODO
-def test_smooth_signal():
+def DISABLED_test_smooth_signal():
     # Signal: 2kHz sine
     f_s = 100
     f_sin = 10
@@ -188,7 +212,8 @@ def test_smooth_signal():
     src_copy = src.copy()
     # Smoothind width
     win_width = 1
-    smoothed_signal = dsp.fract_oct_smooth(src.copy(), win_width, phase_type='Zero')
+    smoothed_signal = dsp.fract_oct_smooth(
+        src.copy(), win_width, phase_type=fs.PhaseType.ZERO)
     # Check if return type is correct:
     assert isinstance(smoothed_signal, Signal)
     # Check metadata:
@@ -205,14 +230,28 @@ def test_phase_handling():
     win_width = 1
     signal = Signal(src_magn*np.exp(1j*src_phase), f_s, domain='freq')
     output_zero_phase = dsp.fract_oct_smooth(signal, win_width, n_bins=None,
-                                             phase_type='Zero')
+                                             phase_type=fs.PhaseType.ZERO)
     output_orig_phase = dsp.fract_oct_smooth(signal, win_width, n_bins=None,
-                                             phase_type='Original')
+                                             phase_type=fs.PhaseType.ORIGINAL)
+
+    # Check zero phase
     assert np.array_equal(np.angle(output_zero_phase.freq), np.zeros(shape))
+    # Check original phase
     assert np.array_equal(np.angle(output_orig_phase.freq), src_phase)
+
+    # Check error exceptions:
     with pytest.raises(Exception) as error:
         assert dsp.fract_oct_smooth(signal, win_width, n_bins=None,
-                                    phase_type='Invalid')
+                                    phase_type=fs.PhaseType.MINIMUM)
+    assert str(error.value) == "PhaseType.MINIMUM is not implemented."
+
+    with pytest.raises(Exception) as error:
+        assert dsp.fract_oct_smooth(signal, win_width, n_bins=None,
+                                    phase_type=fs.PhaseType.LINEAR)
+    assert str(error.value) == "PhaseType.LINEAR is not implemented."
+    with pytest.raises(Exception) as error:
+        assert dsp.fract_oct_smooth(signal, win_width, n_bins=None,
+                                    phase_type='invalid type')
     assert str(error.value) == "Invalid phase type."
 
 
@@ -249,7 +288,7 @@ def test_phase_setter_setter(smoother):
     # Initial number bins
     old_phase_type = smoothing_obj.phase_type
     # New number bins
-    new_phase_type = 'Original'
+    new_phase_type = fs.PhaseType.ORIGINAL
     smoothing_obj.phase_type = new_phase_type
     assert new_phase_type != old_phase_type
     assert smoothing_obj.phase_type == new_phase_type

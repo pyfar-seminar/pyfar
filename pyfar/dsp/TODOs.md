@@ -11,17 +11,18 @@
 * [x] apply() Methode: Signal als Argument, return Signal
 * [x] Neuberechnung oder löschen der Gewichte, wenn Frequenzstützstellenanzahl oder Fensterbreite geändert wird -> Innerhalb der Setter von n_bins und smoothing_width
 * [x] Esetze `polar2cartesian`
-* [ ] Limits Matrix mit scipy.sparse bauen (prüfen)
+* [ ] ~~Limits Matrix mit scipy.sparse bauen (prüfen)~~ (Überflüssig mti neuer Loop Methode)
 * [ ] ``Phase types: minimum, linear``` hinzufügen
-* [ ] Gewichtung über loop für jedes Frequenzbin
+* [x] Gewichtung über loop für jedes Frequenzbin
 
     ### Padding Alternativen:
     * [ ] Spektrum mit konstantem Wert padden (Mittelwert über letztes Fenster nutzen)
     * [ ] Vergleich Zero, Mean und Const Padding in Notebook darstellen
+    * [ ] Evtl. Mean Padding Möglichkeit in Loop Methoed einbauen
     ### Ctors:
     * [ ] Konstruktor mit Signal (ohne n_bins), ohne Signal (mit n_bins)
     * [x] Fractional Smoothing Objekt ohne Signal initalisieren und zurückgeben, analog zu Filter Funktionen
-    * [ ] Möglichkeit neue Daten zu übergeben einbauen
+    * [ ] Möglichkeit neue Daten zu übergeben einbauen 
 
 
 
@@ -53,7 +54,7 @@
     * [x] Test n_bins setter
     * [x] Test smoothing_width setter
     * [x] Test phase type setter
-    * [ ] Test Error in data_padder
+    * [ ] ~~Test Error in data_padder~~ (Überflüssig mti neuer Loop Methode)
 ---
 * [ ] Alle Methoden getestet: ```pytest --cov=. --cov-report=html```
 
