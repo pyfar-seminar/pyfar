@@ -172,8 +172,8 @@ def spectrogram(signal, dB=True, log_prefix=20, log_reference=1,
     window = sgn.get_window(window, window_length)
 
     frequencies, times, spectrogram = sgn.spectrogram(
-            x=signal.time.squeeze(), fs=signal.sampling_rate, window=window,
-            noverlap=window_overlap, mode='magnitude', scaling='spectrum')
+        x=signal.time.squeeze(), fs=signal.sampling_rate, window=window,
+        noverlap=window_overlap, mode='magnitude', scaling='spectrum')
 
     # remove normalization from scipy.signal.spectrogram
     spectrogram /= np.sqrt(1 / window.sum()**2)
@@ -231,13 +231,12 @@ def fract_oct_smooth(src, smoothing_width, n_bins=None, phase_type=None):
     if (src is None and n_bins is None) or \
        (src is not None and n_bins is not None):
         raise ValueError('Either signal or n_bins must be none.')
-
     if (src is not None and not isinstance(src, Signal)):
         raise TypeError("Input data must be of type Signal.")
-    # Generate object
-    obj = fs.FractionalSmoothing(src.n_bins, smoothing_width, phase_type)
-    # If signal is given: return smoothed object
+
     if src is not None:
-        return obj.apply(src)
-    else:
-        return obj
+        # Return smoothed src data
+        return fs.FractionalSmoothing(src.n_bins, smoothing_width,
+                                      phase_type).apply(src)
+    # Return smoothing object
+    return fs.FractionalSmoothing(n_bins, smoothing_width, phase_type)

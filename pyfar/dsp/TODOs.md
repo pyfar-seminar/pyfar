@@ -18,11 +18,11 @@
     ### Padding Alternativen:
     * [x] Spektrum mit konstantem Wert padden (Mittelwert über letztes Fenster nutzen)
     * [ ] Vergleich Zero, Mean und Const Padding in Notebook darstellen
-    * [ ] Evtl. Mean Padding Möglichkeit in Loop Methoed einbauen
+    * [ ] Evtl. Mean Padding Möglichkeit in Loop Methode einbauen
     ### Ctors:
-    * [ ] Konstruktor mit Signal (ohne n_bins), ohne Signal (mit n_bins)
     * [x] Fractional Smoothing Objekt ohne Signal initalisieren und zurückgeben, analog zu Filter Funktionen
-    * [ ] Möglichkeit neue Daten zu übergeben einbauen 
+    * [ ] Konstruktor mit Signal (ohne n_bins), ohne Signal (mit n_bins)
+    * [ ] Möglichkeit neue Daten zu übergeben einbauen (Nicht mehr nötig mit neuer loop Version)
 
 
 
@@ -40,16 +40,16 @@
 * [x] apply() Test fixen (Signal als input und return)
 * [ ] Padding Type testen
     ### Test for `apply()` method:
-    * [ ] Smoothing eines mehrkanaliges Eingangssignal(HRTF) testen
     * [x] Test, ob Gewichte nur auf Magnitude oder auch auf Phase angewendet werden
     * [x] Test check phase handling: Original vs Zero
+    * [ ] Smoothing eines mehrkanaliges Eingangssignal(HRTF) testen
     * [ ] Test, ob input signal verändert wird durch smoothing Objekt
     * [ ] Test to check if the meta-data of the output signal matches that of the input signal
-    * [ ] Test, ob weights matrix neu berechnet wird
+    * [ ] Test, ob weights matrix neu berechnet wird (Überflüssig mti neuer Loop Methode)
     ### Error Exceptions:
     * [x] Ctors und Error Exceptions updaten
-    * [ ] Test Errors in calc_integration limits
-    * [ ] Test Errors in `apply()` und Signal in time domain
+    * [x] Test Errors in `apply()` und Signal in time domain
+    * [ ] Test Errors in calc_integration limits (Überflüssig mti neuer Loop Methode)
 
     ### Get- & Set-Methoden testen:
     * [x] Test n_bins setter

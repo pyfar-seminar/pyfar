@@ -54,7 +54,7 @@ class FractionalSmoothing:
             TODO: other phase types.
         padding_tye : PaddingType
             Specify how to pad signal spectrum, when smoothing window is larger
-            then greatest frequency. 
+            then greatest frequency.
         """
         if not isinstance(smoothing_width, (float, int)):
             raise TypeError("Invalid data type of window width (int/float).")
@@ -74,9 +74,9 @@ class FractionalSmoothing:
         # Set padding type:
         self._padding_type = padding_type
         # Calc weights:
-        self.calc_weights()
+        # self.calc_weights()
         # Set update weight flag to False
-        self._update_weigths = False
+        self._update_weigths = True
 
     def calc_integration_limits(self):
         """
@@ -142,7 +142,12 @@ class FractionalSmoothing:
         self._weights = sparse.csr_matrix(W)
 
     def calc_weights_new(self):
+        """calc_weights
+        Calculates frequency dependent weights from limits as in eq. (16) in
+        _[1].
 
+        New version, does not need to compute limits first. 
+        """
         # Eq. (17) - log integration limits
         # phi_low and phi_high are largely identical - calculation could be
         # made more efficient
@@ -161,23 +166,46 @@ class FractionalSmoothing:
         w_phi_high[phi_high > self.smoothing_width/2] = 1
 
         # Eq (16) - weights
-        W = w_phi_high - w_phi_low
-        W[0] = 0        # fix NaNs for k=0
-        W[0, 0] = 1
+        weights = w_phi_high - w_phi_low
+        weights[0] = 0        # fix NaNs for k=0
+        weights[0, 0] = 1
 
         # Transpose to fit old implementation:
-        W = W.T
+        weights = weights.T
         # as sparse matrix
-        self._weights = sparse.csr_matrix(W)
+        self.weights = sparse.csr_matrix(weights)
 
-    def apply_via_loop(self, src):
+    def apply_via_matrix(self, src):
+        """
+        Apply weights to magnitude spectrum of signal and return new signal
+        with new complex spectrum as in eq. (1) in _[1].
 
+        The weights matrix is repeated according to the number of overall
+        channels. Further, the input data array is padded to fit the size of
+        the weights matrix. By padding the input data array for each frequency
+        bin by the mean value of the part, the input data array that is
+        overlapped by the window, boundary effects at the end of the spectrum
+        are minimized.
+        After applying the weights, the padded part is removed again.
+        The phase of the input data is treated according to the phase_type
+        variable. See phase_type for more information.
+
+        Parameters
+        ----------
+        src : signal
+            Source signal.
+
+        Returns
+        -------
+        ndarray
+            Complex spectrum.
+        """
         if not isinstance(src, Signal):
             raise TypeError("Invalid src input type (Signal).")
         if not src.n_bins == self.n_bins:
-            raise ValueError("Input signal must have same number of frequencies \
-                              bins as set in smoothing object. Set number of \
-                              frequencies with obj.n_bins.")
+            raise ValueError("Input signal must have same number of "
+                             "frequencies bins as set in smoothing object. "
+                             "Set number of frequencies with obj.n_bins.")
 
         # Prepare source signal:
         # Copy flattened signal to buffer:
@@ -193,47 +221,34 @@ class FractionalSmoothing:
         # Get signal data:
         src_data_copy = src_copy.freq.copy()
 
-        # -----------------------------------------------------------------------
-        # Smoothing by loop:
+        # ----------------------------------------------------------------------
+        # Smoothing with matrix:
 
-        # Max smoothing bin:
-        k_max = int(np.ceil(src.n_bins*2**(self.smoothing_width/2)))
+        # Check if weights need to be updated:
+        if self._update_weigths:
+            # Update weights
+            self.calc_weights()
+            # Reset flag
+            self._update_weigths = False
+        # Prepare weighting matrix:
+        # Convert weights to array:
+        weights = self._weights.todense()
+        # Pad_width from difference of weights length and data length
+        pad_width = weights.shape[1] - self.n_bins
+        # Get size of signal that is used to calc mean value to pad:
+        # Difference between data length and start of weighting window
+        mean_size = self.n_bins - (weights != 0).argmax(axis=1)
+        # Add new dimension for channels
+        weights = np.expand_dims(weights, axis=0)
+        # Expand weights matrix for src data
+        weights = np.repeat(weights, src_data_copy.shape[0], axis=0)
+        # Prepare source signal data:
+        src_magn_padded = self.data_padder(np.abs(src_data_copy), pad_width,
+                                           mean_size, self._padding_type)
+        # Multiplication of weighting and data matrix along axis 2
+        dst_magn = np.sum(weights*src_magn_padded, axis=2)
 
-        # Pad signal to fit max window length:
-        pad_length = k_max - src.n_bins
-        if self._padding_type == PaddingType.EDGE:
-            src_magn_padded = np.pad(np.abs(src_data_copy),
-                                     ((0, 0), (0, pad_length)), 'edge')
-        elif self._padding_type == PaddingType.ZERO:
-            src_magn_padded = np.pad(np.abs(src_data_copy),
-                                     ((0, 0), (0, pad_length)), 'zero')
-        else:
-            raise ValueError(
-                'PaddingType.MEAN not implemented for loop method.')
-
-        # Empty dst magnitude array:
-        dst_magn = np.empty_like(src_data_copy)
-
-        # Loop over frequencies, skip k=0
-        dst_magn[0] = np.abs(src_data_copy[0])
-        for k in range(1, src.n_bins):
-            # ki array lenght +1 to fit size after np.ediff1d
-            # ki = k'-0.5 = [-.5, .5, 1.5, ... k_max-.5]
-            ki = np.arange(k_max+1)-.5
-            # Min k' = k*2^(-win/2)
-            ki_min = k*2**(-self.smoothing_width/2)
-            # Replace all entries smaller then minimum by minimum
-            ki[ki < ki_min] = ki_min
-            # Max k' = k*2^(win/2)
-            ki_max = k*2**(self.smoothing_width/2)
-            # Replace all entries greater then maximum by maximum
-            ki[ki > ki_max] = ki_max
-            # Solving integral eq. (16)
-            # (log2(ki+.5) - log2(ki-.5)) / smoothing_width
-            W = np.ediff1d(np.log2(ki))/self.smoothing_width
-            # Apply weights of freq bin k:
-            dst_magn[k] = np.sum(W*src_magn_padded)
-        # -----------------------------------------------------------------------
+        # ----------------------------------------------------------------------
 
         # Remove padded samples:
         dst_magn = dst_magn[:, :self.n_bins]
@@ -264,36 +279,26 @@ class FractionalSmoothing:
         return dst.reshape(src.cshape)
 
     def apply(self, src):
-        """
-        Apply weights to magnitude spectrum of signal and return new signal
-        with new complex spectrum as in eq. (1) in _[1].
-
-        The weights matrix is repeated according to the number of overall
-        channels. Further, the input data array is padded to fit the size of
-        the weights matrix. By padding the input data array for each frequency
-        bin by the mean value of the part, the input data array that is
-        overlapped by the window, boundary effects at the end of the spectrum
-        are minimized.
-        After applying the weights, the padded part is removed again.
-        The phase of the input data is treated according to the phase_type
-        variable. See phase_type for more information.
+        """apply (via loop)
+        New method to smooth signal using a loop over the spectrum computing
+        the weights at each frequency.
 
         Parameters
         ----------
-        src : signal
-            Source signal.
+        src : Signal
+            Input signal that is to be smoothed.
 
         Returns
         -------
-        ndarray
-            Complex spectrum.
+        Signal
+            Smoothed signal of same shape and same metadata.
         """
         if not isinstance(src, Signal):
             raise TypeError("Invalid src input type (Signal).")
         if not src.n_bins == self.n_bins:
-            raise ValueError("Input signal must have same number of frequencies \
-                              bins as set in smoothing object. Set number of \
-                              frequencies with obj.n_bins.")
+            raise ValueError("Input signal must have same number of "
+                             "frequencies bins as set in smoothing object. "
+                             "Set number of frequencies with obj.n_bins.")
 
         # Prepare source signal:
         # Copy flattened signal to buffer:
@@ -309,34 +314,47 @@ class FractionalSmoothing:
         # Get signal data:
         src_data_copy = src_copy.freq.copy()
 
-        # -----------------------------------------------------------------------
-        # Smoothing with matrix:
+        # ----------------------------------------------------------------------
+        # Smoothing by loop:
 
-        # Check if weights need to be updated:
-        if self._update_weigths:
-            # Update weights
-            self.calc_weights()
-            # Reset flag
-            self._update_weigths = False
-        # Prepare weighting matrix:
-        # Convert weights to array:
-        weights = self._weights.todense()
-        # Pad_width from difference of weights length and data length
-        pad_width = weights.shape[1] - self.n_bins
-        # Get size of signal that is used to calc mean value to pad:
-        # Difference between data length and start of weighting window
-        mean_size = self.n_bins - (weights != 0).argmax(axis=1)
-        # Add new dimension for channels
-        weights = np.expand_dims(weights, axis=0)
-        # Expand weights matrix for src data
-        weights = np.repeat(weights, src_data_copy.shape[0], axis=0)
-        # Prepare source signal data:
-        src_magn_padded = self.data_padder(np.abs(src_data_copy), pad_width,
-                                           mean_size, self._padding_type)
-        # Multiplication of weighting and data matrix along axis 2
-        dst_magn = np.sum(weights*src_magn_padded, axis=2)
+        # Max smoothing bin:
+        k_max = int(np.ceil(src.n_bins*2**(self.smoothing_width/2)))
 
-        # -----------------------------------------------------------------------
+        # Pad signal to fit max window length:
+        pad_length = k_max - src.n_bins
+        if self._padding_type == PaddingType.EDGE:
+            src_magn_padded = np.pad(np.abs(src_data_copy),
+                                     ((0, 0), (0, pad_length)), 'edge')
+        elif self._padding_type == PaddingType.ZERO:
+            src_magn_padded = np.pad(np.abs(src_data_copy),
+                                     ((0, 0), (0, pad_length)), 'zero')
+        else:
+            raise ValueError(
+                'PaddingType.MEAN not implemented for loop method.')
+
+        # Empty dst magnitude array:
+        dst_magn = np.empty_like(src_data_copy)
+
+        # Loop over frequencies, skip k=0
+        dst_magn[:, 0] = src_magn_padded[:, 0]
+        for k in range(1, src.n_bins):
+            # ki array lenght +1 to fit size after np.ediff1d
+            # ki = k'-0.5 = [-.5, .5, 1.5, ... k_max-.5]
+            ki = np.arange(k_max+1)-.5
+            # Min k' = k*2^(-win/2)
+            ki_min = k*2**(-self.smoothing_width/2)
+            # Replace all entries smaller then minimum by minimum
+            ki[ki < ki_min] = ki_min
+            # Max k' = k*2^(win/2)
+            ki_max = k*2**(self.smoothing_width/2)
+            # Replace all entries greater then maximum by maximum
+            ki[ki > ki_max] = ki_max
+            # Solving integral eq. (16)
+            # (log2(ki+.5) - log2(ki-.5)) / smoothing_width
+            W = np.ediff1d(np.log2(ki))/self.smoothing_width
+            # Apply weights of freq bin k:
+            dst_magn[:, k] = np.sum(W*src_magn_padded, axis=1)
+        # ----------------------------------------------------------------------
 
         # Remove padded samples:
         dst_magn = dst_magn[:, :self.n_bins]

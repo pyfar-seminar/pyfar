@@ -141,30 +141,6 @@ def test_weights_k10():
         assert w == weights_k10[10, i+k_i[0]]
 
 
-def test_loop_method():
-    signal_length = 100      # Signal length in freq domain
-    win_width = 5
-    phase_type = fs.PhaseType.ZERO
-    # Create smoothing object
-    smoother = fs.FractionalSmoothing(signal_length, win_width, phase_type)
-    weights = smoother._weights.toarray()
-
-    # Pad signal to fit max window length:
-    k_max = int(np.ceil((signal_length-1)*2**(win_width/2))+1)
-    W = np.zeros((signal_length, k_max))
-
-    for k in range(signal_length):
-        ki = np.arange(k_max+1)-.5
-        ki_min = k*2**(-win_width/2)
-        ki_max = k*2**(win_width/2)
-        ki[ki < ki_min] = ki_min
-        ki[ki > ki_max] = ki_max
-        W[k] = np.ediff1d(np.log2(ki))/win_width
-    W[0] = 0
-    W[0, 0] = 1
-    assert np.allclose(weights, W, atol=1e-15)
-
-
 def test_apply():
     # Source signal:
     channels = 1
@@ -174,13 +150,26 @@ def test_apply():
     sampling_rate = 44100
     src_signal = Signal(data, sampling_rate, domain='freq')
 
-    # Create smoothing object
+    # Create smoothing object with differing n_bins
     win_width = 1
-    smoother = fs.FractionalSmoothing(signal_length, win_width)
-    # Compute weights:
-    smoother.calc_weights()
-    # Apply
-    smoothed_signal = smoother.apply(src_signal)
+    smoother = fs.FractionalSmoothing(int(1.1*signal_length), win_width)
+
+    # Apply with wrong input type:
+    with pytest.raises(Exception) as error:
+        assert smoother.apply_via_matrix('string')
+    assert str(error.value) == "Invalid src input type (Signal)."
+
+    # Apply with valid input type but differing n_bins:
+    with pytest.raises(Exception) as error:
+        assert smoother.apply_via_matrix(src_signal)
+    assert str(error.value) == ("Input signal must have same number of "
+                                "frequencies bins as set in smoothing object. "
+                                "Set number of frequencies with obj.n_bins.")
+
+    # Change n_bins:
+    smoother.n_bins = signal_length
+    # Apply with valid input type and correct n_bins:
+    smoothed_signal = smoother.apply_via_matrix(src_signal)
     smoothed_data = smoothed_signal.freq
 
     # Convert to array
@@ -200,7 +189,50 @@ def test_apply():
         assert np.sum(weights[k, :]*padded_data) == smoothed_data[0, k]
 
 
-# TODO
+def test_apply_via_loop():
+    # Source signal:
+    channels = 2
+    signal_length = 30      # Signal length in freq domain
+    data = np.zeros((channels, signal_length), dtype=np.complex)
+    data[:, 3] = 1
+    sampling_rate = 44100
+    src_signal = Signal(data, sampling_rate, domain='freq')
+
+    # Create smoothing object with differing n_bins
+    win_width = 1
+    padding_type = fs.PaddingType.EDGE
+    smoother = fs.FractionalSmoothing(int(1.1*signal_length), win_width,
+                                      padding_type=padding_type)
+    # Compute weights:
+    smoother.calc_weights()
+
+    # Apply with wrong input type:
+    with pytest.raises(Exception) as error:
+        assert smoother.apply('string')
+    assert str(error.value) == "Invalid src input type (Signal)."
+
+    # Apply with valid input type but differing n_bins:
+    with pytest.raises(Exception) as error:
+        assert smoother.apply(src_signal)
+    assert str(error.value) == ("Input signal must have same number of "
+                                "frequencies bins as set in smoothing object. "
+                                "Set number of frequencies with obj.n_bins.")
+
+    # Change n_bins:
+    smoother.n_bins = signal_length
+    # Use old apply to check smoothed output:
+    exp_smoothed_data = smoother.apply_via_matrix(src_signal).freq
+
+    # Apply with valid input type and correct n_bins:
+    smoothed_signal = smoother.apply(src_signal)
+    smoothed_data = smoothed_signal.freq
+
+    # Check shape
+    assert smoothed_data.shape == data.shape
+    # Check data
+    assert np.allclose(smoothed_data, exp_smoothed_data, atol=1e-15)
+
+
 def DISABLED_test_smooth_signal():
     # Signal: 2kHz sine
     f_s = 100
@@ -208,18 +240,21 @@ def DISABLED_test_smooth_signal():
     dur = 1
     sine = np.atleast_2d(np.sin(2 * np.pi * f_sin * np.arange(dur*f_s) / f_s))
     src = Signal(sine, fs, n_samples=sine.size)
-    # Kopie: src_copy = src oder src_copy = src.copy ?
+    # Copy
     src_copy = src.copy()
     # Smoothind width
     win_width = 1
-    smoothed_signal = dsp.fract_oct_smooth(
-        src.copy(), win_width, phase_type=fs.PhaseType.ZERO)
+    padding_type = fs.PaddingType.EDGE
+    phase_type = fs.PhaseType.ZERO
+    smoothed_signal = dsp.fract_oct_smooth(src.copy(), win_width,
+                                           phase_type=phase_type,
+                                           padding_type=padding_type)
     # Check if return type is correct:
     assert isinstance(smoothed_signal, Signal)
     # Check metadata:
     assert smoothed_signal._assert_matching_meta_data(src)
     # Check if input signal has changed:
-    assert src == src_copy
+    assert np.alltrue(src.time == src_copy.time)
 
 
 def test_phase_handling():
@@ -255,7 +290,7 @@ def test_phase_handling():
     assert str(error.value) == "Invalid phase type."
 
 
-def test_n_bins_setter(smoother):
+def test_setter_n_bins(smoother):
     smoothing_obj, _ = smoother
     # Weights update should be False
     assert smoothing_obj._update_weigths is False
@@ -268,7 +303,7 @@ def test_n_bins_setter(smoother):
     assert smoothing_obj._update_weigths is True
 
 
-def test_smoothing_width_setter(smoother):
+def test_setter_smoothing_width(smoother):
     smoothing_obj, _ = smoother
     # Weights update should be False
     assert smoothing_obj._update_weigths is False
@@ -281,7 +316,7 @@ def test_smoothing_width_setter(smoother):
     assert smoothing_obj._update_weigths is True
 
 
-def test_phase_setter_setter(smoother):
+def test_setter_phase(smoother):
     smoothing_obj, _ = smoother
     # Weights update should be False
     assert smoothing_obj._update_weigths is False
