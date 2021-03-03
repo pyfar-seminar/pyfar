@@ -190,9 +190,10 @@ def spectrogram(signal, dB=True, log_prefix=20, log_reference=1,
     return frequencies, times, spectrogram
 
 
-def fract_oct_smooth(src, smoothing_width, n_bins=None, phase_type=None):
-    """
-    Smooth magnitude spectrum of a signal with fractional octave width
+def fract_oct_smooth(src, smoothing_width, n_bins=None,
+                     phase_type=fs.PhaseType.ZERO,
+                     padding_type=fs.PaddingType.MEAN):
+    """Smooth magnitude spectrum of a signal with fractional octave width
     according to _[1]. If no signal is given, smoothing object is returned.
 
     Creates an object of class FractionalSmoothing to compute smoothing weights
@@ -206,14 +207,20 @@ def fract_oct_smooth(src, smoothing_width, n_bins=None, phase_type=None):
 
     Parameters
     ----------
-    src : Signal
+        src : Signal
         Input signal to be smoothed
     smoothing_width : float, int
         Width of smoothing window relative to an octave
     n_bins : int, default None.
-        Number of frequency bins of signal.
-    phase_type : str, default None
-        Phase handling specifier. `None` to return signal with zero phase.
+        Number of frequency bins of signal, by default None.
+    phase_type : PhaseType, optional
+        Phase type specifier: Default is PhaseType.ZERO: signal with zero
+        phase is returned. PhaseType.ORIGINAL copies phase from input
+        signal, by default fs.PhaseType.ZERO
+        TODO: other phase types.
+    padding_tye : PaddingType, optional
+        Specify how to pad signal spectrum, when smoothing window is larger
+        then greatest frequency, by default fs.PaddingType.MEAN
 
     Returns
     -------
@@ -228,8 +235,8 @@ def fract_oct_smooth(src, smoothing_width, n_bins=None, phase_type=None):
            J. Audio Eng. Soc., vol. 65, no. 3, pp. 239-245, (2017 March.).
            doi: https://doi.org/10.17743/jaes.2016.0053
     """
-    if (src is None and n_bins is None) or \
-       (src is not None and n_bins is not None):
+    if (src is None and n_bins is None) \
+            or (src is not None and n_bins is not None):
         raise ValueError('Either signal or n_bins must be none.')
     if (src is not None and not isinstance(src, Signal)):
         raise TypeError("Input data must be of type Signal.")
@@ -237,6 +244,7 @@ def fract_oct_smooth(src, smoothing_width, n_bins=None, phase_type=None):
     if src is not None:
         # Return smoothed src data
         return fs.FractionalSmoothing(src.n_bins, smoothing_width,
-                                      phase_type).apply(src)
+                                      phase_type, padding_type).apply(src)
     # Return smoothing object
-    return fs.FractionalSmoothing(n_bins, smoothing_width, phase_type)
+    return fs.FractionalSmoothing(n_bins, smoothing_width, phase_type,
+                                  padding_type)

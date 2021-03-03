@@ -78,7 +78,7 @@ class FractionalSmoothing:
         # Set update weight flag to False
         self._update_weigths = True
 
-    def calc_integration_limits(self):
+    def _calc_integration_limits(self):
         """
         Compute integration limits for each frequency bin as in eq. (17) in
         _[1].
@@ -110,7 +110,7 @@ class FractionalSmoothing:
         # TODO: Warum +1?
         size = int(np.ceil(k_cutoff_up[-1])+1)
         k_mat = np.array([
-            self.lim_padder(low, up, size) for low, up in
+            self._lim_padder(low, up, size) for low, up in
             zip(k_cutoff_low, k_cutoff_up)])
         # Divide by k:
         k_divider = np.array([k_i]*(k_mat.shape[2]*2)).T.reshape(k_mat.shape)
@@ -122,9 +122,8 @@ class FractionalSmoothing:
         # Convert limits matrix to csr matrices
         return sparse.csr_matrix(limits[:, 0]), sparse.csr_matrix(limits[:, 1])
 
-    def calc_weights(self):
-        """calc_weights
-        Calculates frequency dependent weights from limits as in eq. (16) in
+    def _calc_weights(self):
+        """Calculates frequency dependent weights from limits as in eq. (16) in
         _[1].
 
         Each weight is computed from integrating over a rectangular window from
@@ -133,7 +132,7 @@ class FractionalSmoothing:
         the magnitude at 0 Hz remains through the smoothing process.
         """
         # Get limits:
-        limits = self.calc_integration_limits()
+        limits = self._calc_integration_limits()
         # Computation: Upper - Lower / Smoothing_Width and store in array
         W = limits[0] - limits[1]
         W /= self.smoothing_width
@@ -141,9 +140,8 @@ class FractionalSmoothing:
         W[0, 0] = 1
         self._weights = sparse.csr_matrix(W)
 
-    def calc_weights_new(self):
-        """calc_weights
-        Calculates frequency dependent weights from limits as in eq. (16) in
+    def _calc_weights_new(self):
+        """Calculates frequency dependent weights from limits as in eq. (16) in
         _[1].
 
         New version, does not need to compute limits first. 
@@ -176,8 +174,7 @@ class FractionalSmoothing:
         self.weights = sparse.csr_matrix(weights)
 
     def apply_via_matrix(self, src):
-        """
-        Apply weights to magnitude spectrum of signal and return new signal
+        """Apply weights to magnitude spectrum of signal and return new signal
         with new complex spectrum as in eq. (1) in _[1].
 
         The weights matrix is repeated according to the number of overall
@@ -209,17 +206,12 @@ class FractionalSmoothing:
 
         # Prepare source signal:
         # Copy flattened signal to buffer:
-        if src.cshape != (1,):
-            src_copy = src.flatten()
-        else:
-            src_copy = src.copy()
+        src_copy = src.flatten()
         # Set buffer signal to frequency domain
         if src_copy.domain != 'freq':
             src_copy.domain = 'freq'
         # Set FFT norm for input signal to "none":
         src_copy.fft_norm = 'none'
-        # Get signal data:
-        src_data_copy = src_copy.freq.copy()
 
         # ----------------------------------------------------------------------
         # Smoothing with matrix:
@@ -227,7 +219,7 @@ class FractionalSmoothing:
         # Check if weights need to be updated:
         if self._update_weigths:
             # Update weights
-            self.calc_weights()
+            self._calc_weights()
             # Reset flag
             self._update_weigths = False
         # Prepare weighting matrix:
@@ -241,10 +233,10 @@ class FractionalSmoothing:
         # Add new dimension for channels
         weights = np.expand_dims(weights, axis=0)
         # Expand weights matrix for src data
-        weights = np.repeat(weights, src_data_copy.shape[0], axis=0)
+        weights = np.repeat(weights, src_copy.cshape, axis=0)
         # Prepare source signal data:
-        src_magn_padded = self.data_padder(np.abs(src_data_copy), pad_width,
-                                           mean_size, self._padding_type)
+        src_magn_padded = self._data_padder(np.abs(src_copy.freq), pad_width,
+                                            mean_size, self.padding_type)
         # Multiplication of weighting and data matrix along axis 2
         dst_magn = np.sum(weights*src_magn_padded, axis=2)
 
@@ -256,10 +248,10 @@ class FractionalSmoothing:
         # Phase handling:
         if self.phase_type == PhaseType.ORIGINAL:
             # Copy phase from original data
-            dst_phase = np.angle(src_data_copy)
+            dst_phase = np.angle(src_copy.freq)
         elif self.phase_type == PhaseType.ZERO:
             # Copy phase from original data
-            dst_phase = np.zeros_like(src_data_copy)
+            dst_phase = np.zeros_like(src_copy.freq)
         # TODO: other phase types.
         elif self.phase_type == PhaseType.MINIMUM:
             raise ValueError("PhaseType.MINIMUM is not implemented.")
@@ -279,8 +271,7 @@ class FractionalSmoothing:
         return dst.reshape(src.cshape)
 
     def apply(self, src):
-        """apply (via loop)
-        New method to smooth signal using a loop over the spectrum computing
+        """New method to smooth signal using a loop over the spectrum computing
         the weights at each frequency.
 
         Parameters
@@ -302,41 +293,36 @@ class FractionalSmoothing:
 
         # Prepare source signal:
         # Copy flattened signal to buffer:
-        if src.cshape != (1,):
-            src_copy = src.flatten()
-        else:
-            src_copy = src.copy()
+        src_copy = src.flatten()
         # Set buffer signal to frequency domain
         if src_copy.domain != 'freq':
             src_copy.domain = 'freq'
         # Set FFT norm for input signal to "none":
         src_copy.fft_norm = 'none'
-        # Get signal data:
-        src_data_copy = src_copy.freq.copy()
 
-        # ----------------------------------------------------------------------
-        # Smoothing by loop:
-
+        # ----------------------- SMOOTHING BY LOOP ----------------------------
+        # Empty dst magnitude array:
+        dst_magn = np.empty_like(src_copy.freq)
+        # Loop over frequencies, skip k=0
+        dst_magn[:, 0] = np.abs(src_copy.freq)[:, 0]
         # Max smoothing bin:
         k_max = int(np.ceil(src.n_bins*2**(self.smoothing_width/2)))
-
-        # Pad signal to fit max window length:
+        # Padding length:
         pad_length = k_max - src.n_bins
-        if self._padding_type == PaddingType.EDGE:
-            src_magn_padded = np.pad(np.abs(src_data_copy),
+
+        # Padding type:
+        if self.padding_type == PaddingType.EDGE:
+            src_magn_padded = np.pad(np.abs(src_copy.freq),
                                      ((0, 0), (0, pad_length)), 'edge')
-        elif self._padding_type == PaddingType.ZERO:
-            src_magn_padded = np.pad(np.abs(src_data_copy),
-                                     ((0, 0), (0, pad_length)), 'zero')
+        elif self.padding_type == PaddingType.ZERO:
+            src_magn_padded = np.pad(np.abs(src_copy.freq),
+                                     ((0, 0), (0, pad_length)))
+        elif self.padding_type == PaddingType.MEAN:
+            # Padding is done inside loop
+            src_magn = np.abs(src_copy.freq)
         else:
-            raise ValueError(
-                'PaddingType.MEAN not implemented for loop method.')
+            raise ValueError("Invalid padding type.")
 
-        # Empty dst magnitude array:
-        dst_magn = np.empty_like(src_data_copy)
-
-        # Loop over frequencies, skip k=0
-        dst_magn[:, 0] = src_magn_padded[:, 0]
         for k in range(1, src.n_bins):
             # ki array lenght +1 to fit size after np.ediff1d
             # ki = k'-0.5 = [-.5, .5, 1.5, ... k_max-.5]
@@ -352,6 +338,13 @@ class FractionalSmoothing:
             # Solving integral eq. (16)
             # (log2(ki+.5) - log2(ki-.5)) / smoothing_width
             W = np.ediff1d(np.log2(ki))/self.smoothing_width
+            # Mean padding:
+            if self.padding_type == PaddingType.MEAN:
+                mean_length = src.n_bins - (W != 0).argmax(axis=0)
+                src_magn_padded = np.pad(src_magn,
+                                         ((0, 0), (0, pad_length)),
+                                         'mean',
+                                         stat_length=(mean_length))
             # Apply weights of freq bin k:
             dst_magn[:, k] = np.sum(W*src_magn_padded, axis=1)
         # ----------------------------------------------------------------------
@@ -362,10 +355,10 @@ class FractionalSmoothing:
         # Phase handling:
         if self.phase_type == PhaseType.ORIGINAL:
             # Copy phase from original data
-            dst_phase = np.angle(src_data_copy)
+            dst_phase = np.angle(src_copy.freq)
         elif self.phase_type == PhaseType.ZERO:
             # Copy phase from original data
-            dst_phase = np.zeros_like(src_data_copy)
+            dst_phase = np.zeros_like(src_copy.freq)
         # TODO: other phase types.
         elif self.phase_type == PhaseType.MINIMUM:
             raise ValueError("PhaseType.MINIMUM is not implemented.")
@@ -386,8 +379,7 @@ class FractionalSmoothing:
 
     @property
     def n_bins(self):
-        """get_n_bins
-        Return number of frequencies bins.
+        """Return number of frequencies bins.
 
         Returns
         -------
@@ -398,8 +390,7 @@ class FractionalSmoothing:
 
     @n_bins.setter
     def n_bins(self, n_bins):
-        """
-        Sets number of frequencies bins.
+        """Sets number of frequencies bins.
 
         Parameters
         ----------
@@ -421,8 +412,7 @@ class FractionalSmoothing:
 
     @property
     def smoothing_width(self):
-        """
-        Return smoothing width.
+        """Return smoothing width.
 
         Returns
         -------
@@ -434,8 +424,7 @@ class FractionalSmoothing:
 
     @smoothing_width.setter
     def smoothing_width(self, smoothing_width):
-        """
-        Sets smoothing_width of the ovtace rectangular smoothing window.
+        """Sets smoothing_width of the ovtace rectangular smoothing window.
 
         Parameters
         ----------
@@ -458,8 +447,7 @@ class FractionalSmoothing:
 
     @property
     def phase_type(self):
-        """phase_type
-        Specify how to treate phase of signal.
+        """Specify how to treate phase of signal.
 
         ORIGINAL  Use phase of input signal.
         ZERO      Set phase of smoothed singal to zero.
@@ -475,8 +463,7 @@ class FractionalSmoothing:
 
     @phase_type.setter
     def phase_type(self, phase_type):
-        """phase_type
-        Set phase type.
+        """Set phase type.
 
         Parameters
         ----------
@@ -488,8 +475,43 @@ class FractionalSmoothing:
         # Save phase type:
         self._phase_type = phase_type
 
+    @property
+    def padding_type(self):
+        """Specfiy how to pad signal at the end of the sprectrum.
+
+        The signal's spectrum has to be padded to fit the size of the smoothing
+        window at high frequencies.
+        The following three padding types are available:
+
+        ZERO    Pads signal with zeros.
+        EDGE    Pads signal with edge value (value at highes frequency bin).
+        MEAN    Pads signal for each frequency by the mean value of the signal
+                that is overlapped by the smoothing window.
+
+        Returns
+        -------
+        PaddingType
+            Padding type.
+        """
+        return self._padding_type
+
+    @padding_type.setter
+    def padding_type(self, padding_type):
+        """Set padding type.
+
+        Parameters
+        ----------
+        padding_type : PaddingType
+            Padding type.
+
+        """
+        if not isinstance(padding_type, PaddingType):
+            raise TypeError("Invalid padding type.")
+        # Save padding type:
+        self._padding_type = padding_type
+
     @staticmethod
-    def lim_padder(low, up, size):
+    def _lim_padder(low, up, size):
         """
         Returns a 2D array of shape (2, 'size') containing a range of
         k+.5 and k-.5 values with k increasing from 'low' to 'up' values.
@@ -540,7 +562,7 @@ class FractionalSmoothing:
             lower_limit.reshape(1, -1)))
 
     @staticmethod
-    def data_padder(data, pad_width, mean_size, padding_type):
+    def _data_padder(data, pad_width, mean_size, padding_type):
         """
         Pads data array of shape (N, M) to data matrix of shape
         (N, N, M+pad_width). The output data contains M copies of the input
@@ -585,8 +607,8 @@ class FractionalSmoothing:
                                for m in mean_size])
         elif padding_type == PaddingType.ZERO:
             padded = np.array([np.pad(np.abs(data),
-                                      ((0, 0), (0, pad_width)), 'constant',
-                                      (0, 0)) for m in mean_size])
+                                      ((0, 0), (0, pad_width)))
+                               for m in mean_size])
         else:
             raise ValueError(
                 'PaddingType.MEAN not implemented for loop method.')
