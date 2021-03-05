@@ -1,7 +1,9 @@
 import pytest
 from pytest import approx
 
-from pyfar.dsp import fractional_octave_smoothing as fs
+from pyfar.dsp.fractional_octave_smoothing import FractionalSmoothing as fs
+from pyfar.dsp.fractional_octave_smoothing import PhaseType
+from pyfar.dsp.fractional_octave_smoothing import PaddingType
 from pyfar.dsp import dsp as dsp
 from pyfar import Signal
 import numpy as np
@@ -11,11 +13,11 @@ import numpy as np
 def smoother():
     signal_length = 100      # Signal length in freq domain
     win_width = 5
-    phase_type = fs.PhaseType.ZERO
-    padding_type = fs.PaddingType.MEAN
+    phase_type = PhaseType.ZERO
+    padding_type = PaddingType.MEAN
     # Create smoothing object
-    smoother = fs.FractionalSmoothing(signal_length, win_width, phase_type,
-                                      padding_type=padding_type)
+    smoother = fs(signal_length, win_width, phase_type,
+                  padding_type=padding_type)
     # Compute integration limits
     limits = smoother._calc_integration_limits()
     # Compute weights:
@@ -54,24 +56,29 @@ def white_noise_1():
 def test_init():
     signal_length = 10
     win_width = 1
-    phase_type = fs.PhaseType.ZERO
-    smoother = fs.FractionalSmoothing(signal_length, win_width, phase_type)
-    assert isinstance(smoother, fs.FractionalSmoothing)
+    phase_type = PhaseType.ZERO
+    smoother = fs(signal_length, win_width, phase_type)
+    assert isinstance(smoother, fs)
     assert smoother.smoothing_width == win_width
 
 
 def test_init_exceptions():
     signal_length = 10
     win_width = 1
+
     with pytest.raises(Exception) as error:
-        assert fs.FractionalSmoothing('str', win_width)
+        assert fs('str', win_width)
     assert str(error.value) == "Invalid data type of number of bins (int)."
     with pytest.raises(Exception) as error:
-        assert fs.FractionalSmoothing(signal_length, 'str')
+        assert fs(signal_length, 'str')
     assert str(error.value) == "Invalid data type of window width (int/float)."
-    with pytest.raises(Exception) as error:
-        assert fs.FractionalSmoothing(signal_length, win_width, 'str')
-    assert str(error.value) == "Invalid phase type."
+    with pytest.raises(Exception, match="Invalid phase type."):
+        assert fs(signal_length, win_width,
+                  phase_type='str')
+
+    with pytest.raises(Exception, match="Invalid padding type."):
+        assert fs(signal_length, win_width,
+                  padding_type='str')
 
 
 def test_calc_integration_limits(smoother):
@@ -149,7 +156,7 @@ def test_weights_k10():
     # Check weight for k=10, win_width = 1
     win_width = 1
     # Create smoothing object
-    smoother_k10 = fs.FractionalSmoothing(signal_length, win_width)
+    smoother_k10 = fs(signal_length, win_width)
     # Compute weights:
     smoother_k10._calc_weights()
     weights_k10 = (smoother_k10._weights).toarray()
@@ -177,9 +184,9 @@ def test_apply_via_matrix(sine_2):
 
     # Create smoothing object with differing n_bins
     win_width = 1
-    padding_type = fs.PaddingType.ZERO
-    smoother = fs.FractionalSmoothing(int(1.1*src_signal.n_bins), win_width,
-                                      padding_type=padding_type)
+    padding_type = PaddingType.ZERO
+    smoother = fs(int(1.1*src_signal.n_bins), win_width,
+                  padding_type=padding_type)
 
     # Apply with wrong input type:
     with pytest.raises(Exception) as error:
@@ -222,9 +229,9 @@ def test_apply_via_loop(sine_2):
 
     # Create smoothing object with differing n_bins
     win_width = 1
-    padding_type = fs.PaddingType.EDGE
-    smoother = fs.FractionalSmoothing(int(1.1*src_signal.n_bins), win_width,
-                                      padding_type=padding_type)
+    padding_type = PaddingType.EDGE
+    smoother = fs(int(1.1*src_signal.n_bins), win_width,
+                  padding_type=padding_type)
 
     # Apply with wrong input type:
     with pytest.raises(Exception) as error:
@@ -259,8 +266,8 @@ def test_smooth_signal(sine_2):
     src_copy = sine_2.copy()
     # Smoothind width
     win_width = 1
-    padding_type = fs.PaddingType.EDGE
-    phase_type = fs.PhaseType.ZERO
+    padding_type = PaddingType.EDGE
+    phase_type = PhaseType.ZERO
     smoothed_signal = dsp.fract_oct_smooth(src_signal, win_width,
                                            phase_type=phase_type,
                                            padding_type=padding_type)
@@ -284,15 +291,13 @@ def test_phase_handling():
 
     # Smoothing objects
     win_width = 1
-    padding_type = fs.PaddingType.EDGE
-    output_zero_phase = dsp.fract_oct_smooth(src_signal, win_width,
-                                             n_bins=None,
-                                             phase_type=fs.PhaseType.ZERO,
-                                             padding_type=padding_type)
-    output_orig_phase = dsp.fract_oct_smooth(src_signal, win_width,
-                                             n_bins=None,
-                                             phase_type=fs.PhaseType.ORIGINAL,
-                                             padding_type=padding_type)
+    padding_type = PaddingType.EDGE
+    output_zero_phase = fs(src_signal.n_bins, win_width,
+                           phase_type=PhaseType.ZERO,
+                           padding_type=padding_type).apply(src_signal)
+    output_orig_phase = fs(src_signal.n_bins, win_width,
+                           phase_type=PhaseType.ORIGINAL,
+                           padding_type=padding_type).apply(src_signal)
 
     # Check zero phase
     assert np.array_equal(np.angle(output_zero_phase.freq), np.zeros(shape))
@@ -301,20 +306,19 @@ def test_phase_handling():
 
     # Check error exceptions:
     with pytest.raises(Exception) as error:
-        assert dsp.fract_oct_smooth(src_signal, win_width, n_bins=None,
-                                    phase_type=fs.PhaseType.MINIMUM,
-                                    padding_type=padding_type)
+        assert fs(src_signal.n_bins, win_width,
+                  phase_type=PhaseType.MINIMUM,
+                  padding_type=padding_type).apply(src_signal)
     assert str(error.value) == "PhaseType.MINIMUM is not implemented."
-
     with pytest.raises(Exception) as error:
-        assert dsp.fract_oct_smooth(src_signal, win_width, n_bins=None,
-                                    phase_type=fs.PhaseType.LINEAR,
-                                    padding_type=padding_type)
+        assert fs(src_signal.n_bins, win_width,
+                  phase_type=PhaseType.LINEAR,
+                  padding_type=padding_type).apply(src_signal)
     assert str(error.value) == "PhaseType.LINEAR is not implemented."
     with pytest.raises(Exception) as error:
-        assert dsp.fract_oct_smooth(src_signal, win_width, n_bins=None,
-                                    phase_type='invalid type',
-                                    padding_type=padding_type)
+        assert fs(src_signal.n_bins, win_width,
+                  phase_type='invalid type',
+                  padding_type=padding_type).apply(src_signal)
     assert str(error.value) == "Invalid phase type."
 
 
@@ -323,26 +327,27 @@ def test_padding_handling(white_noise_1):
     src_signal = white_noise_1
 
     # Smoothing objects
+    n_bins = src_signal.n_bins
     win_width = 1
-    phase_type = fs.PhaseType.ORIGINAL
+    phase_type = PhaseType.ORIGINAL
     # Zero padding
-    paddig_type = fs.PaddingType.ZERO
-    output_zero_padding = dsp.fract_oct_smooth(src_signal, win_width,
-                                               n_bins=None,
-                                               phase_type=phase_type,
-                                               padding_type=paddig_type)
+    paddig_type = PaddingType.ZERO
+    assert isinstance(fs(n_bins, win_width, phase_type=phase_type,
+                         padding_type=paddig_type).apply(src_signal), Signal)
     # Edge padding
-    paddig_type = fs.PaddingType.EDGE
-    output_edge_padding = dsp.fract_oct_smooth(src_signal, win_width,
-                                               n_bins=None,
-                                               phase_type=phase_type,
-                                               padding_type=paddig_type)
+    paddig_type = PaddingType.EDGE
+    assert isinstance(fs(n_bins, win_width, phase_type=phase_type,
+                         padding_type=paddig_type).apply(src_signal), Signal)
     # Mean padding
-    paddig_type = fs.PaddingType.MEAN
-    output_mean_padding = dsp.fract_oct_smooth(src_signal, win_width,
-                                               n_bins=None,
-                                               phase_type=phase_type,
-                                               padding_type=paddig_type)
+    paddig_type = PaddingType.MEAN
+    assert isinstance(fs(n_bins, win_width, phase_type=phase_type,
+                         padding_type=paddig_type).apply(src_signal), Signal)
+    # Exceptions:
+    with pytest.raises(Exception) as error:
+        assert fs(n_bins, win_width,
+                  phase_type=phase_type,
+                  padding_type="string").apply(src_signal)
+    assert str(error.value) == "Invalid padding type."
 
 
 def test_setter_n_bins(smoother):
@@ -356,6 +361,10 @@ def test_setter_n_bins(smoother):
     smoothing_obj.n_bins = new_n_bins
     assert smoothing_obj.n_bins == new_n_bins
     assert smoothing_obj._update_weigths is True
+    # Invalid data type:
+    with pytest.raises(Exception) as error:
+        smoothing_obj.n_bins = 'string'
+    assert str(error.value) == "Invalid data type of number of bins (int)."
 
 
 def test_setter_smoothing_width(smoother):
@@ -369,6 +378,10 @@ def test_setter_smoothing_width(smoother):
     smoothing_obj.smoothing_width = new_smoothing_width
     assert smoothing_obj.smoothing_width == new_smoothing_width
     assert smoothing_obj._update_weigths is True
+    # Invalid data type:
+    with pytest.raises(Exception) as error:
+        smoothing_obj.smoothing_width = 'string'
+    assert str(error.value) == "Invalid data type of window width (int/float)."
 
 
 def test_setter_phase(smoother):
@@ -378,11 +391,15 @@ def test_setter_phase(smoother):
     # Initial phase type
     old_phase_type = smoothing_obj.phase_type
     # New phase type
-    new_phase_type = fs.PhaseType.ORIGINAL
+    new_phase_type = PhaseType.ORIGINAL
     smoothing_obj.phase_type = new_phase_type
     assert new_phase_type != old_phase_type
     assert smoothing_obj.phase_type == new_phase_type
     assert smoothing_obj._update_weigths is True
+    # Invalid phase type:
+    with pytest.raises(Exception) as error:
+        smoothing_obj.phase_type = 'string'
+    assert str(error.value) == "Invalid phase type."
 
 
 def test_setter_padding(smoother):
@@ -392,10 +409,14 @@ def test_setter_padding(smoother):
     # Old padding type
     old_padding_type = smoothing_obj.padding_type
     # New padding type
-    new_padding_type = fs.PaddingType.EDGE
+    new_padding_type = PaddingType.EDGE
     smoothing_obj.padding_type = new_padding_type
     assert new_padding_type != old_padding_type
     assert smoothing_obj.padding_type == new_padding_type
+    # Invalid padding type:
+    with pytest.raises(Exception) as error:
+        smoothing_obj.padding_type = 'string'
+    assert str(error.value) == "Invalid padding type."
 
 
 def test_data_padder(smoother):
@@ -409,8 +430,8 @@ def test_data_padder(smoother):
     smoothing_obj, _ = smoother
 
     # MEAN
-    padded_mean = smoothing_obj.data_padder(data, pad_width, mean_size,
-                                            fs.PaddingType.MEAN)
+    padded_mean = smoothing_obj._data_padder(data, pad_width, mean_size,
+                                             PaddingType.MEAN)
     assert (padded_mean.shape == (cshape, cshape, int(length+pad_width))) \
         is True
     assert np.array_equal(padded_mean[0, :, :], padded_mean[1, :, :]) is True
@@ -423,15 +444,27 @@ def test_data_padder(smoother):
         data[2, (length-mean_size[2]):]))
 
     # ZERO
-    padded_zero = smoothing_obj.data_padder(data, pad_width, mean_size,
-                                            fs.PaddingType.ZERO)
+    padded_zero = smoothing_obj._data_padder(data, pad_width, mean_size,
+                                             PaddingType.ZERO)
     assert (padded_zero.shape == (cshape, cshape, int(length+pad_width))) \
         is True
     assert np.alltrue(padded_zero[0, :, length:] == 0)
 
     # EDGE
-    padded_edge = smoothing_obj.data_padder(data, pad_width, mean_size,
-                                            fs.PaddingType.EDGE)
+    padded_edge = smoothing_obj._data_padder(data, pad_width, mean_size,
+                                             PaddingType.EDGE)
     assert (padded_zero.shape == (cshape, cshape, int(length+pad_width))) \
         is True
     assert np.alltrue(padded_edge[0, :, length:] == data[0, -1])
+
+    # Exceptions:
+    data_3d = np.atleast_3d(np.empty((10)))
+    with pytest.raises(Exception) as error:
+        assert smoothing_obj._data_padder(data_3d, pad_width, mean_size,
+                                          PaddingType.MEAN)
+    assert str(error.value) == "Data array must be 2D."
+    with pytest.raises(Exception) as error:
+        assert smoothing_obj._data_padder(data, pad_width, mean_size,
+                                          'string')
+    assert str(
+        error.value) == "Invalid PaddingType or PaddingType not implemented."

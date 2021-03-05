@@ -94,10 +94,6 @@ class FractionalSmoothing:
         ndarray
             Limits array of shape (n_bins, 2, max_smoothing_freq_bin).
         """
-        if not self.n_bins:
-            raise ValueError("Number of frequency bins not given.")
-        if not self.smoothing_width:
-            raise ValueError("Smoothing width not given.")
         # Freq bin iterator:
         k_i = np.arange(self.n_bins)
         # Lower and upper cutoff frequencies bin for each bin k:
@@ -611,7 +607,7 @@ class FractionalSmoothing:
                                for m in mean_size])
         else:
             raise ValueError(
-                'PaddingType.MEAN not implemented for loop method.')
+                'Invalid PaddingType or PaddingType not implemented.')
 
         # move channel axis to front and return
         return np.moveaxis(padded, 1, 0)
