@@ -192,7 +192,7 @@ def spectrogram(signal, dB=True, log_prefix=20, log_reference=1,
 
 def fract_oct_smooth(src, smoothing_width, n_bins=None,
                      phase_type=fs.PhaseType.ZERO,
-                     padding_type=fs.PaddingType.MEAN):
+                     padding_type=fs.PaddingType.EDGE):
     """Smooth magnitude spectrum of a signal with fractional octave width
     according to _[1]. If no signal is given, smoothing object is returned.
 
@@ -220,7 +220,7 @@ def fract_oct_smooth(src, smoothing_width, n_bins=None,
         TODO: other phase types.
     padding_tye : PaddingType, optional
         Specify how to pad signal spectrum, when smoothing window is larger
-        then greatest frequency, by default fs.PaddingType.MEAN
+        then greatest frequency, by default fs.PaddingType.EDGE
 
     Returns
     -------

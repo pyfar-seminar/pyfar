@@ -12,12 +12,13 @@
 * [x] Neuberechnung oder löschen der Gewichte, wenn Frequenzstützstellenanzahl oder Fensterbreite geändert wird -> Innerhalb der Setter von n_bins und smoothing_width
 * [x] Esetze `polar2cartesian`
 * [ ] ~~Limits Matrix mit scipy.sparse bauen (prüfen)~~ (Überflüssig mti neuer Loop Methode)
-* [ ] ``Phase types: minimum, linear``` hinzufügen
+* [ ] `Phase types: minimum, linear` hinzufügen
 * [x] Gewichtung über loop für jedes Frequenzbin
 
     ### Padding Alternativen:
     * [x] Spektrum mit konstantem Wert padden (Mittelwert über letztes Fenster nutzen)
     * [x] Mean Padding Möglichkeit in Loop Methode einbauen
+    * [x] Zero Padding
     ### Ctors:
     * [x] Fractional Smoothing Objekt ohne Signal initalisieren und zurückgeben, analog zu Filter Funktionen
     * [x] Möglichkeit neue Daten zu übergeben einbauen (Nicht mehr nötig mit neuer loop Version)
@@ -36,7 +37,7 @@
 * [x] Berechnung der Gewichte
 * [x] Gewichte mit analytischer Lösung vergleichen (für einen Frequenzstützstelle)
 * [x] Berechnung des geglätteten Signals
-* [x] apply() Test fixen (Signal als input und return)
+* [x] `apply()` Test fixen (Signal als input und return)
 * [x] `data_padder` 
 
     ### Test for `apply()` method:
@@ -65,6 +66,14 @@
 * [x] Methoden dokumentieren
 * [ ] Jupyter Notebook Tutorial schreiben
 
-    ### Inhalt Jupyter Notebook:
-    * [ ] Vergleich Zero, Mean und Const Padding in Notebook darstellen
+## Inhalt Jupyter Notebook:
+* [x] Klasse, Methoden, Enums vorstellen
+* [x] Erstellen eines Smoothing Objekts per Konstruktor
+* [ ] Smoothing per `apply()`
+* [x] Smoothing per `dsp.fract_oct_smooth`
+* [x] Vergleich Zero, Mean und Const Padding in Notebook darstellen
+
+    ### Zeitmessung und Optimierung:
     * [ ] Unterschied smoothing per Matrix vs smoothing per Loop
+    * [ ] Benchmark mit apply Methode: multithreading, Signallänge
+    * [ ] Evtl. `cython` oder `numba` nutzen

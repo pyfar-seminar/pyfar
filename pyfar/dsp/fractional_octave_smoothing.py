@@ -1,18 +1,30 @@
-from enum import Enum
+from enum import Enum, unique
 import numpy as np
 from pyfar import Signal
 import scipy.sparse as sparse
 # from pyfar import Signal
 
 
+@unique
 class PhaseType(Enum):
+    """Phase handling enumeration
+
+    Specifies how the phase of the smoothed signal is generated.
+
+    """
     ZERO = 0
     ORIGINAL = 1
     MINIMUM = 2
     LINEAR = 3
 
 
+@unique
 class PaddingType(Enum):
+    """Padding type enumeration
+
+    Specifies how the signal's spectrum is padded.
+
+    """
     ZERO = 0
     EDGE = 1
     MEAN = 2
@@ -20,7 +32,9 @@ class PaddingType(Enum):
 
 class FractionalSmoothing:
     """ Class of fractional smoothing object.
-        Object contains data of a signal and a given smoothing width.
+
+        Object contains number of frequency bins of a signal and a given
+        smoothing width.
 
         References
         ----------
@@ -118,7 +132,7 @@ class FractionalSmoothing:
         # Convert limits matrix to csr matrices
         return sparse.csr_matrix(limits[:, 0]), sparse.csr_matrix(limits[:, 1])
 
-    def _calc_weights(self):
+    def _calc_weights_old(self):
         """Calculates frequency dependent weights from limits as in eq. (16) in
         _[1].
 
@@ -140,12 +154,12 @@ class FractionalSmoothing:
         """Calculates frequency dependent weights from limits as in eq. (16) in
         _[1].
 
-        New version, does not need to compute limits first. 
+        New version, does not need to compute limits first.
         """
         # Eq. (17) - log integration limits
         # phi_low and phi_high are largely identical - calculation could be
         # made more efficient
-        k_max = int(np.ceil((self._n_bins-1)*2**(self.smoothing_width/2)))
+        k_max = int(np.ceil((self._n_bins-1)*2**(self.smoothing_width/2))+1)
         k = np.atleast_2d(np.arange(k_max))
         phi_low = np.log2((k.T - .5) / k[:, :self._n_bins])
         phi_high = np.log2((k.T + .5) / k[:, :self._n_bins])
@@ -167,7 +181,7 @@ class FractionalSmoothing:
         # Transpose to fit old implementation:
         weights = weights.T
         # as sparse matrix
-        self.weights = sparse.csr_matrix(weights)
+        self._weights = sparse.csr_matrix(weights)
 
     def apply_via_matrix(self, src):
         """Apply weights to magnitude spectrum of signal and return new signal
@@ -215,7 +229,7 @@ class FractionalSmoothing:
         # Check if weights need to be updated:
         if self._update_weigths:
             # Update weights
-            self._calc_weights()
+            self._calc_weights_new()
             # Reset flag
             self._update_weigths = False
         # Prepare weighting matrix:
@@ -296,13 +310,17 @@ class FractionalSmoothing:
         # Set FFT norm for input signal to "none":
         src_copy.fft_norm = 'none'
 
-        # ----------------------- SMOOTHING BY LOOP ----------------------------
+        # ----------------------- SMOOTHING BY LOOP ---------------------------
         # Empty dst magnitude array:
         dst_magn = np.empty_like(src_copy.freq)
         # Loop over frequencies, skip k=0
         dst_magn[:, 0] = np.abs(src_copy.freq)[:, 0]
         # Max smoothing bin:
         k_max = int(np.ceil(src.n_bins*2**(self.smoothing_width/2)))
+        # ki array lenght +1 to fit size after np.ediff1d
+        # ki = k'-0.5 = [-.5, .5, 1.5, ... k_max-.5]
+        ki = np.arange(k_max+1)-.5
+        ki_buffer = np.empty_like(ki)
         # Padding length:
         pad_length = k_max - src.n_bins
 
@@ -320,20 +338,19 @@ class FractionalSmoothing:
             raise ValueError("Invalid padding type.")
 
         for k in range(1, src.n_bins):
-            # ki array lenght +1 to fit size after np.ediff1d
-            # ki = k'-0.5 = [-.5, .5, 1.5, ... k_max-.5]
-            ki = np.arange(k_max+1)-.5
+            # Copy arry into buffer
+            ki_buffer = ki.copy()
             # Min k' = k*2^(-win/2)
             ki_min = k*2**(-self.smoothing_width/2)
             # Replace all entries smaller then minimum by minimum
-            ki[ki < ki_min] = ki_min
+            ki_buffer[ki < ki_min] = ki_min
             # Max k' = k*2^(win/2)
             ki_max = k*2**(self.smoothing_width/2)
             # Replace all entries greater then maximum by maximum
-            ki[ki > ki_max] = ki_max
+            ki_buffer[ki > ki_max] = ki_max
             # Solving integral eq. (16)
             # (log2(ki+.5) - log2(ki-.5)) / smoothing_width
-            W = np.ediff1d(np.log2(ki))/self.smoothing_width
+            W = np.ediff1d(np.log2(ki_buffer))/self.smoothing_width
             # Mean padding:
             if self.padding_type == PaddingType.MEAN:
                 mean_length = src.n_bins - (W != 0).argmax(axis=0)

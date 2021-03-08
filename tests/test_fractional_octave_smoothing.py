@@ -21,7 +21,7 @@ def smoother():
     # Compute integration limits
     limits = smoother._calc_integration_limits()
     # Compute weights:
-    smoother._calc_weights()
+    smoother._calc_weights_new()
     return smoother, limits
 
 
@@ -158,7 +158,7 @@ def test_weights_k10():
     # Create smoothing object
     smoother_k10 = fs(signal_length, win_width)
     # Compute weights:
-    smoother_k10._calc_weights()
+    smoother_k10._calc_weights_new()
     weights_k10 = (smoother_k10._weights).toarray()
     k = 10
     # k*2^(-win_width) <= k' <= k*2^(win_width/2):
@@ -175,7 +175,7 @@ def test_weights_k10():
     # (Integral over rectangular window)
     expected_weights_k10 = (phi_up - phi_low)/win_width
     for i, w in enumerate(expected_weights_k10):
-        assert w == weights_k10[10, i+k_i[0]]
+        assert np.allclose(w, weights_k10[10, i+k_i[0]], atol=1e-8)
 
 
 def test_apply_via_matrix(sine_2):
@@ -228,7 +228,7 @@ def test_apply_via_loop(sine_2):
     src_signal = sine_2
 
     # Create smoothing object with differing n_bins
-    win_width = 1
+    win_width = 1.3
     padding_type = PaddingType.EDGE
     smoother = fs(int(1.1*src_signal.n_bins), win_width,
                   padding_type=padding_type)
